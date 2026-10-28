@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
 <meta name="robots" content="noindex">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="build" content="__BUILD__">
 <title>Team day planner</title>
 <style>
 :root{--bg:#fff;--subtle:#f6f7f9;--elev:#fff;--bd:#e2e5e9;--bds:#eceef1;--focus:#3b6cf6;--t1:#111418;--t2:#4a5059;--t3:#8a9099;--ok:#1f9d55;--bad:#d93025;--warn:#b26a00;--acc:#eaf0ff;--fill:#eceef1;--r:8px}
@@ -131,6 +133,9 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
 .loading{padding:60px;text-align:center;color:var(--t3)}
 /* ---------- mobile (UI only; desktop untouched above 720px) ---------- */
 .mob,.seg{display:none}
+.colwrap[data-kind=a]{display:none}
+.btn[disabled]{opacity:.4;cursor:default}
+.colsub{display:flex;justify-content:space-between;gap:8px;font-size:12px;line-height:16px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--t3);margin:8px 2px 6px}
 @media (max-width:720px){
   html{-webkit-text-size-adjust:100%}
   body{overflow-x:hidden}
@@ -158,12 +163,12 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   .fbody.open{display:block}
   /* one column at a time per person, chosen with a sticky segmented control */
   .seg{display:flex;position:sticky;top:0;z-index:40;gap:4px;padding:6px 0;margin:0 0 8px;background:var(--bg)}
-  .seg button{flex:1 1 0;min-width:0;min-height:48px;border:1px solid var(--bd);background:var(--subtle);color:var(--t2);border-radius:10px;font:600 14px/18px inherit;font-family:inherit;padding:4px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .seg button{flex:1 1 0;min-width:0;min-height:48px;border:1px solid var(--bd);background:var(--subtle);color:var(--t2);border-radius:10px;font:600 14px/18px inherit;font-family:inherit;padding:4px 3px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center}
   .seg button .small{font-weight:400;font-variant-numeric:tabular-nums;white-space:nowrap}
   .seg button.on{background:var(--acc);border-color:var(--focus);color:var(--t1)}
   .lane{display:block}
   .lane .colwrap{display:none}
-  .lane[data-tab=b] .colwrap[data-kind=b],.lane[data-tab=t] .colwrap[data-kind=t],.lane[data-tab=w] .colwrap[data-kind=w]{display:flex}
+  .lane[data-tab=b] .colwrap[data-kind=b],.lane[data-tab=t] .colwrap[data-kind=t],.lane[data-tab=w] .colwrap[data-kind=w],.lane[data-tab=a] .colwrap[data-kind=a]{display:flex}
   .col{padding:10px;min-height:80px}
   .scroll{max-height:none;overflow:visible;padding-right:0}
   .grphd .lbl{font-size:18px}
@@ -238,6 +243,11 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   function load(force) {
     S.loading = true; paintStatus();
     return api('GET', '/api/board' + (force ? '?refresh=1' : '')).then(function (b) {
+      // stale page (tab kept open or cached across a deploy): reload once to pick up the new HTML
+      var mb = document.querySelector('meta[name=build]'), pageBuild = mb ? mb.content : '';
+      if (b.build && pageBuild && pageBuild !== '__BUILD__' && b.build !== pageBuild && sessionStorage.getItem('dp-reload') !== b.build) {
+        sessionStorage.setItem('dp-reload', b.build); location.reload(); return;
+      }
       S.board = b; S.byId = {};
       b.tasks.forEach(function (x) { S.byId[x.i] = x; });
       S.loading = false; render();
@@ -320,7 +330,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   }
   function bump(id, delta) {
     var x = S.byId[id]; if (!x) return;
-    x.m = Math.max(5, Math.min(480, x.m + delta)); x.e = 1; render();
+    x.m = Math.max(10, Math.min(480, x.m + delta)); // never below 10 min x.e = 1; render();
     clearTimeout(S.minTimers[id]);
     S.minTimers[id] = setTimeout(function () {
       var want = x.m;
@@ -405,10 +415,9 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     else h += '<span class="dd ' + (overdue ? 'over' : dueToday ? 'due' : '') + '" data-act="due" data-id="' + x.i + '" role="button" tabindex="0" title="Change due date">' + dueTxt + '</span>';
     h += assignChips(x, 'data-act');
     h += '</div><div class="ctl">';
-    h += '<button class="btn" data-act="bump" data-d="-5" data-id="' + x.i + '" aria-label="Minus 5 minutes">−5</button>';
+    h += '<button class="btn" data-act="bump" data-d="-10" data-id="' + x.i + '" aria-label="Minus 10 minutes"' + (x.m <= 10 ? ' disabled' : '') + '>−10</button>';
     h += '<span class="mins">' + x.m + ' min</span>';
-    h += '<button class="btn" data-act="bump" data-d="5" data-id="' + x.i + '" aria-label="Plus 5 minutes">+5</button>';
-    h += '<button class="btn" data-act="bump" data-d="15" data-id="' + x.i + '" aria-label="Plus 15 minutes">+15</button>';
+    h += '<button class="btn" data-act="bump" data-d="10" data-id="' + x.i + '" aria-label="Plus 10 minutes">+10</button>';
     if (!x.e && !done) h += '<span class="small">no estimate</span>';
     h += '<span style="flex:1"></span>';
     var tk = kind === 'b' ? k : (x.t || x.w || k);
@@ -442,6 +451,8 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     });
     return h + '</div>';
   }
+  // Which of a lane's columns a task sits in: 't' Today, 'w' Tomorrow, 'b' Backlog.
+  function colOf(x, k) { return x.t === k ? 't' : x.w === k ? 'w' : 'b'; }
   function column(k, kind, title, items, total, extra, mt) {
     extra = extra || [];
     var zone = k + kind;
@@ -455,12 +466,22 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
         '" title="New task in ' + esc(sp.n) + '" aria-label="New task in ' + esc(sp.n) + '">+</button>' : '';
       h += '<div class="grp"><div class="grphd"><span class="lbl">' + esc(grp.g.label) + add + '</span><span class="small">' + own.length + ' · ' + hm(sum(own)) +
         (un.length ? '<span style="opacity:.8">  + ' + un.length + ' unassigned · ' + hm(sum(un)) + '</span>' : '') + '</span></div>';
-      own.forEach(function (x) { h += card(x, kind, k); });
-      un.forEach(function (x) { h += card(x, kind, k); });
+      if (kind === 'a') { // All: sub-headed by the column each task is in; buttons as in that column
+        [['t', 'Today'], ['w', 'Tomorrow'], ['b', 'Backlog']].forEach(function (c) {
+          var xs = own.concat(un).filter(function (x) { return colOf(x, k) === c[0]; });
+          if (!xs.length) return;
+          h += '<div class="colsub"><span>' + c[1] + '</span><span>' + xs.length + ' · ' + hm(sum(xs)) + '</span></div>';
+          xs.forEach(function (x) { h += card(x, c[0], k); });
+        });
+      } else {
+        own.forEach(function (x) { h += card(x, kind, k); });
+        un.forEach(function (x) { h += card(x, kind, k); });
+      }
       h += '</div>';
     });
     if (!items.length && kind === 't') h += '<div class="small empty">Drag tasks here or press Today →</div>';
     if (!items.length && kind === 'w') h += '<div class="small empty">Drag tasks here or press Tomorrow →</div>';
+    if (!items.length && kind === 'a') h += '<div class="small empty">No open tasks</div>';
     return h + '</div></div>';
   }
   // Load card (top 'Today's load' and the per-lane counters). m = minutes counted against the 8h cap.
@@ -543,11 +564,14 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
       var cntTom = loadCard('Tomorrow', sum(tomAll.filter(function (x) { return !x.c; })), sum(tomAll.filter(function (x) { return x.c; })), 'cmp', mtW, 'w-' + p.k);
       // spacer above Backlog: an invisible copy of a counter, so the three columns line up exactly
       var cntSpacer = loadCard('Backlog', 0, 0, 'cmp spacer', mtT, 'spacer');
+      // All (mobile tab): every open task of the lane, once each, whatever column it is in
+      var seenA = {}, allItems = backOpen.concat(todayItems, tomItems).filter(function (x) { if (x.c || seenA[x.i]) return false; seenA[x.i] = 1; return true; });
       var tab = S.tab[p.k] || 't';
       var segB = function (kd, lbl, n, min) { return '<button data-act="mtab" data-k="' + p.k + '" data-kind="' + kd + '" class="' + (tab === kd ? 'on' : '') + '" aria-pressed="' + (tab === kd) + '">' + lbl + '<span class="small">' + n + ' · ' + hm(min) + '</span></button>'; };
       h += '<section><h2>' + esc(p.name) + ' · ' + openN + ' open' + (S.showDone ? ' · ' + doneN + ' completed in 14 days' : '') + '</h2>';
-      h += '<div class="seg" role="group" aria-label="' + esc(p.name) + ' columns">' + segB('b', 'Backlog', back.length, sum(back)) + segB('t', 'Today', todayItems.length, sum(day)) + segB('w', 'Tomorrow', tomItems.length, sum(tomItems.filter(function (x) { return !x.c; }))) + '</div>';
+      h += '<div class="seg" role="group" aria-label="' + esc(p.name) + ' columns">' + segB('a', 'All', allItems.length, sum(allItems)) + segB('b', 'Backlog', back.length, sum(back)) + segB('t', 'Today', todayItems.length, sum(day)) + segB('w', 'Tomorrow', tomItems.length, sum(tomItems.filter(function (x) { return !x.c; }))) + '</div>';
       h += '<div class="lane" data-tab="' + tab + '">';
+      h += '<div class="colwrap" data-kind="a">' + column(p.k, 'a', 'All open', allItems, sum(allItems)) + '</div>';
       h += '<div class="colwrap" data-kind="b">' + cntSpacer + column(p.k, 'b', 'Backlog', back, sum(back), gray) + '</div>';
       h += '<div class="colwrap" data-kind="t">' + cntToday + column(p.k, 't', 'Today', todayItems, sum(plannedDay(p.k)), null, mtT) + '</div>';
       h += '<div class="colwrap" data-kind="w">' + cntTom + column(p.k, 'w', 'Tomorrow', tomItems, sum(tomItems.filter(function (x) { return !x.c; })), null, mtW) + '</div>';
@@ -598,7 +622,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     S.dueEdit = null;
     S.ed = { id: '', isNew: true, loading: false, err: '', saving: false,
       ctx: { pg: b.getAttribute('data-pg'), kind: kind, k: k, pre: b.getAttribute('data-pre') },
-      data: { n: b.getAttribute('data-pre'), notes: 'D15M\n', d: kind === 't' ? S.board.today : kind === 'w' ? S.board.tomorrow : '', a: k === 'un' ? 'un' : k, p: b.getAttribute('data-pn'), par: '' } };
+      data: { n: b.getAttribute('data-pre'), notes: 'D10M\n', d: kind === 't' ? S.board.today : kind === 'w' ? S.board.tomorrow : '', a: k === 'un' ? 'un' : k, p: b.getAttribute('data-pn'), par: '' } };
     paintEditor();
     var n = modal.querySelector('.tname'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
   }
@@ -618,7 +642,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
         (t.due_at ? ' <span class="small">has a time in Asana; saving a new date drops the time</span>' : '') + '</span></div>';
       h += '<div class="f"><label>Projects</label><span>' + esc(t.p || '—') + (t.par ? '<br><span class="small">↳ subtask of ' + esc(t.par) + '</span>' : '') + '</span></div>';
       h += '<label class="desc" for="ed-notes">Description</label><textarea class="notes" id="ed-notes">' + esc(t.notes) + '</textarea>';
-      h += '<div class="note">First line is the duration code (e.g. D15M, D1H30M). If it is missing on save, D15M is added.' +
+      h += '<div class="note">First line is the duration code (e.g. D10M, D1H30M). If it is missing on save, D10M is added.' +
         (t.rich ? ' <b>This description has formatting in Asana; changing it here saves it as plain text.</b>' : '') + '</div>';
     }
     h += '</div><div class="pft">';
@@ -735,7 +759,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   });
   document.addEventListener('dragend', function () { S.drag = null; S.over = null; [].forEach.call(document.querySelectorAll('.hot,.drag'), function (el) { el.classList.remove('hot', 'drag'); }); });
   document.addEventListener('dragover', function (e) {
-    var z = e.target.closest && e.target.closest('.col'); if (!z || !S.drag) return;
+    var z = e.target.closest && e.target.closest('.col'); if (!z || !S.drag || z.getAttribute('data-kind') === 'a') return;
     e.preventDefault(); e.dataTransfer.dropEffect = 'move';
     if (S.over !== z.getAttribute('data-zone')) {
       [].forEach.call(document.querySelectorAll('.col.hot'), function (el) { el.classList.remove('hot'); });
@@ -743,7 +767,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     }
   });
   document.addEventListener('drop', function (e) {
-    var z = e.target.closest && e.target.closest('.col'); if (!z) return;
+    var z = e.target.closest && e.target.closest('.col'); if (!z || z.getAttribute('data-kind') === 'a') return;
     e.preventDefault();
     var id = e.dataTransfer.getData('text/plain') || S.drag, x = S.byId[id], k = z.getAttribute('data-k'), kind = z.getAttribute('data-kind');
     S.drag = null; S.over = null;
@@ -751,6 +775,13 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     if (kind === 't') toToday(id, k); else if (kind === 'w') toTomorrow(id, k); else if (x.t === k || x.w === k) toBacklog(id); else render();
   });
 
+  // back/forward cache restore: fetch a fresh page instead of showing the frozen one
+  window.addEventListener('pageshow', function (e) { if (e.persisted) location.reload(); });
+  // phone tab brought back after a while: reload the board (which also catches a new deploy)
+  var hiddenAt = 0;
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) hiddenAt = Date.now(); else if (hiddenAt && Date.now() - hiddenAt > 5 * 60000 && !S.loading) load();
+  });
   load();
 })();
 </script>

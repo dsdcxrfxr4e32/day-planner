@@ -284,7 +284,7 @@ async function setCompleted({ i, completed }) {
 
 async function setMinutes({ i, m }) {
   if (!gidOk(i)) throw Object.assign(new Error('bad task id'), { status: 400 });
-  const minutes = Math.max(5, Math.min(CFG.CAP_MIN, Math.round(Number(m) || L.DEFAULT_MIN)));
+  const minutes = L.clampMinutes(m, CFG.CAP_MIN);
   const t = (await asana('GET', '/tasks/' + i + '?opt_fields=notes,html_notes')).data;
   const body = L.isPlainHtml(t.notes, t.html_notes) ? { notes: L.rewritePlainNotes(t.notes, minutes) } : { html_notes: L.rewriteHtmlNotes(t.html_notes, minutes) };
   const d = (await asana('PUT', '/tasks/' + i + '?opt_fields=notes', { data: body })).data;
@@ -426,8 +426,12 @@ async function createTask(body) {
 /* ---------- HTTP ---------- */
 const ROUTES = { '/api/completed': setCompleted, '/api/minutes': setMinutes, '/api/today': setToday, '/api/clear-today': clearToday, '/api/plan': movePlan, '/api/assign': assignTask, '/api/task': createTask };
 
-function send(res, status, body, type) {
-  res.writeHead(status, { 'Content-Type': type || 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer' });
+// Build id: the deployed commit on Render, else the process start. The page carries it and reloads
+// itself when /api/board reports a different one (a tab left open across a deploy).
+const BUILD = String(process.env.RENDER_GIT_COMMIT || Date.now().toString(36)).slice(0, 12);
+const HTML_HEADERS = { 'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0', Pragma: 'no-cache', Expires: '0' };
+function send(res, status, body, type, extra) {
+  res.writeHead(status, { 'Content-Type': type || 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer', ...(extra || {}) });
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 }
 
@@ -441,11 +445,11 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
     if (url.pathname === '/healthz') return send(res, 200, { ok: true });
-    if (!keyOk(req, url)) return send(res, 403, '<h1>403</h1><p>This link needs its access key.</p>', 'text/html; charset=utf-8');
+    if (!keyOk(req, url)) return send(res, 403, '<h1>403</h1><p>This link needs its access key.</p>', 'text/html; charset=utf-8', HTML_HEADERS);
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-      return send(res, 200, fs.readFileSync(path.join(DIR, 'public', 'index.html')), 'text/html; charset=utf-8');
+      return send(res, 200, fs.readFileSync(path.join(DIR, 'public', 'index.html'), 'utf8').replace('__BUILD__', BUILD), 'text/html; charset=utf-8', HTML_HEADERS);
     }
-    if (req.method === 'GET' && url.pathname === '/api/board') return send(res, 200, await getBoard(url.searchParams.get('refresh') === '1'));
+    if (req.method === 'GET' && url.pathname === '/api/board') return send(res, 200, { ...(await getBoard(url.searchParams.get('refresh') === '1')), build: BUILD });
     const tm = /^\/api\/task\/(\d{5,25})$/.exec(url.pathname);
     if (tm && req.method === 'GET') return send(res, 200, await getTask(tm[1]));
     if (req.method === 'POST' && (ROUTES[url.pathname] || tm)) {
