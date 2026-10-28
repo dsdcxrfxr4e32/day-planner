@@ -598,7 +598,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     S.dueEdit = null;
     S.ed = { id: '', isNew: true, loading: false, err: '', saving: false,
       ctx: { pg: b.getAttribute('data-pg'), kind: kind, k: k, pre: b.getAttribute('data-pre') },
-      data: { n: b.getAttribute('data-pre'), notes: 'D10M\n', d: kind === 't' ? S.board.today : kind === 'w' ? S.board.tomorrow : '', a: k === 'un' ? 'un' : k, p: b.getAttribute('data-pn'), par: '' } };
+      data: { n: b.getAttribute('data-pre'), notes: 'D15M\n', d: kind === 't' ? S.board.today : kind === 'w' ? S.board.tomorrow : '', a: k === 'un' ? 'un' : k, p: b.getAttribute('data-pn'), par: '' } };
     paintEditor();
     var n = modal.querySelector('.tname'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
   }
@@ -618,7 +618,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
         (t.due_at ? ' <span class="small">has a time in Asana; saving a new date drops the time</span>' : '') + '</span></div>';
       h += '<div class="f"><label>Projects</label><span>' + esc(t.p || '—') + (t.par ? '<br><span class="small">↳ subtask of ' + esc(t.par) + '</span>' : '') + '</span></div>';
       h += '<label class="desc" for="ed-notes">Description</label><textarea class="notes" id="ed-notes">' + esc(t.notes) + '</textarea>';
-      h += '<div class="note">First line is the duration code (e.g. D10M, D1H30M). If it is missing on save, D10M is added.' +
+      h += '<div class="note">First line is the duration code (e.g. D15M, D1H30M). If it is missing on save, D15M is added.' +
         (t.rich ? ' <b>This description has formatting in Asana; changing it here saves it as plain text.</b>' : '') + '</div>';
     }
     h += '</div><div class="pft">';

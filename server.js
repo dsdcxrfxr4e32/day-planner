@@ -269,7 +269,7 @@ async function getBoard(force) {
     if (owner) tom = ''; // at most one of Today/Tomorrow; Today wins
     const d = L.dueDay(t), pl = L.placeByDate({ t: owner, w: tom, lane: a, due: d, today });
     seen.add(t.gid);
-    tasks.push({ i: t.gid, a, n: t.name || '', p: projects.join(', '), pg: t.projects && t.projects[0] ? t.projects[0].gid : '', par: t.parent ? t.parent.name : '', d, m: m === null ? 10 : m, e: m === null ? 0 : 1, c, t: pl.t, w: pl.w, ...(pl.src ? { src: pl.src } : {}) });
+    tasks.push({ i: t.gid, a, n: t.name || '', p: projects.join(', '), pg: t.projects && t.projects[0] ? t.projects[0].gid : '', par: t.parent ? t.parent.name : '', d, m: m === null ? L.DEFAULT_MIN : m, e: m === null ? 0 : 1, c, t: pl.t, w: pl.w, ...(pl.src ? { src: pl.src } : {}) });
   }));
   return { today, tomorrow: L.addDays(today, 1), meet, cap: CFG.CAP_MIN, store: CFG.TODAY_STORE, workspace: CFG.WORKSPACE, people: CFG.PEOPLE.map(({ k, name }) => ({ k, name })), projects: sectionProjects(), loadedAt: new Date().toISOString(), tasks };
 }
@@ -284,7 +284,7 @@ async function setCompleted({ i, completed }) {
 
 async function setMinutes({ i, m }) {
   if (!gidOk(i)) throw Object.assign(new Error('bad task id'), { status: 400 });
-  const minutes = Math.max(5, Math.min(CFG.CAP_MIN, Math.round(Number(m) || 10)));
+  const minutes = Math.max(5, Math.min(CFG.CAP_MIN, Math.round(Number(m) || L.DEFAULT_MIN)));
   const t = (await asana('GET', '/tasks/' + i + '?opt_fields=notes,html_notes')).data;
   const body = L.isPlainHtml(t.notes, t.html_notes) ? { notes: L.rewritePlainNotes(t.notes, minutes) } : { html_notes: L.rewriteHtmlNotes(t.html_notes, minutes) };
   const d = (await asana('PUT', '/tasks/' + i + '?opt_fields=notes', { data: body })).data;
@@ -302,7 +302,7 @@ function taskView(t) {
     a: t.assignee ? ((CFG.PEOPLE.find((x) => x.gid === t.assignee.gid) || {}).k || 'other') : 'un',
     p: (t.projects || []).map((x) => x.name).join(', '), par: t.parent ? t.parent.name : '',
     link: t.permalink_url || '', rich: !L.isPlainHtml(t.notes, t.html_notes), completed: !!t.completed,
-    m: m === null ? 10 : m, e: m === null ? 0 : 1,
+    m: m === null ? L.DEFAULT_MIN : m, e: m === null ? 0 : 1,
   };
 }
 async function getTask(i) {
@@ -312,7 +312,7 @@ async function getTask(i) {
 // Body: any of {name, notes, due_on}. Only fields that differ from Asana's current value are sent.
 async function updateTask(i, edits) {
   if (!gidOk(i)) throw Object.assign(new Error('bad task id'), { status: 400 });
-  const cur = (await asana('GET', '/tasks/' + i + '?opt_fields=name,notes,due_on')).data;
+  const cur = (await asana('GET', '/tasks/' + i + '?opt_fields=name,notes,html_notes,due_on')).data;
   const body = L.buildTaskUpdate(cur, edits);
   if (!Object.keys(body).length) return { ...(await getTask(i)), changed: [] };
   const t = (await asana('PUT', '/tasks/' + i + '?opt_fields=' + EDIT_FIELDS, { data: body })).data;
@@ -418,7 +418,7 @@ async function createTask(body) {
   const m = L.minutesFromNotes(t.notes);
   return {
     i: t.gid, a, n: t.name || '', p: (t.projects || []).map((x) => x.name).join(', '), pg: String(body.project), par: '', d: t.due_on || '',
-    m: m === null ? 10 : m, e: m === null ? 0 : 1, c: '', t: planned && planned.s === 't' ? planned.k : '', w: planned && planned.s === 'w' ? planned.k : '',
+    m: m === null ? L.DEFAULT_MIN : m, e: m === null ? 0 : 1, c: '', t: planned && planned.s === 't' ? planned.k : '', w: planned && planned.s === 'w' ? planned.k : '',
     tagged: !slot || !!planned,
   };
 }

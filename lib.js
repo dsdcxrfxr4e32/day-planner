@@ -2,6 +2,10 @@
 // Pure helpers shared by the server and the tests.
 const DCODE_RE = /^\s*D\s?(?:(\d+(?:[.,]\d+)?)\s*H)?\s*(?:(\d+)\s*M)?(?![A-Za-z0-9])/i;
 
+// Minutes counted for a task whose notes have no D-code, and the code the app writes on save.
+const DEFAULT_MIN = 15;
+const DEFAULT_DCODE = 'D15M';
+
 function minutesFromNotes(notes) {
   const first = String(notes || '').split('\n')[0];
   const m = DCODE_RE.exec(first);
@@ -57,18 +61,23 @@ function addDays(ymd, n) {
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 }
 
-// Editor save: the first line must stay a D-code; otherwise prepend D10M.
+// App save: the first line must be a D-code (same DCODE_RE as the parser); otherwise
+// prepend D15M as its own line and keep the existing notes below. Existing codes are never changed.
 function ensureDCode(notes) {
   notes = String(notes == null ? '' : notes).replace(/\r\n?/g, '\n');
   if (minutesFromNotes(notes) !== null) return notes;
-  return notes.trim() ? 'D10M\n' + notes : 'D10M';
+  return notes.trim() ? DEFAULT_DCODE + '\n' + notes : DEFAULT_DCODE;
 }
 
 const normNotes = (s) => String(s == null ? '' : s).replace(/\r\n?/g, '\n');
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Build the Asana PUT body from the editor's edits: only fields present in `edits`
-// that differ from `current` (the task as Asana has it now). Throws on bad input.
+// that differ from `current` (the task as Asana has it now: name, notes, html_notes, due_on).
+// Saving a name or notes always leaves a D-code on the notes' first line: edited notes go through
+// ensureDCode; a name-only save of a task without a code also gets D15M (in html_notes when the
+// notes are rich text, so formatting is kept). A due-date-only save never touches the notes.
+// Throws on bad input.
 function buildTaskUpdate(current, edits) {
   const out = {};
   edits = edits || {};
@@ -80,6 +89,9 @@ function buildTaskUpdate(current, edits) {
   if (edits.notes !== undefined) {
     const n = ensureDCode(edits.notes);
     if (n !== normNotes(current.notes)) out.notes = n;
+  } else if (out.name !== undefined && minutesFromNotes(current.notes) === null) {
+    if (isPlainHtml(current.notes, current.html_notes)) out.notes = ensureDCode(current.notes);
+    else out.html_notes = rewriteHtmlNotes(current.html_notes, DEFAULT_MIN);
   }
   if (edits.due_on !== undefined) {
     const d = edits.due_on ? String(edits.due_on) : null;
@@ -114,4 +126,4 @@ function placeByDate({ t, w, lane, due, today }) {
 // Due date of an Asana task as an Athens day: due_at (a time) wins, else due_on.
 function dueDay(t) { return t.due_at ? athensDate(t.due_at) : t.due_on || ''; }
 
-module.exports = { placeByDate, dueDay, buildNewTask, ensureDCode, buildTaskUpdate, DCODE_RE, minutesFromNotes, formatDCode, rewritePlainNotes, rewriteHtmlNotes, isPlainHtml, athensDate, addDays };
+module.exports = { DEFAULT_MIN, DEFAULT_DCODE, placeByDate, dueDay, buildNewTask, ensureDCode, buildTaskUpdate, DCODE_RE, minutesFromNotes, formatDCode, rewritePlainNotes, rewriteHtmlNotes, isPlainHtml, athensDate, addDays };
