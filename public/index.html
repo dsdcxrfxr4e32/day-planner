@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="robots" content="noindex">
+<title>Team day planner</title>
+<style>
+:root{--bg:#fff;--subtle:#f6f7f9;--elev:#fff;--bd:#e2e5e9;--bds:#eceef1;--focus:#3b6cf6;--t1:#111418;--t2:#4a5059;--t3:#8a9099;--ok:#1f9d55;--bad:#d93025;--warn:#b26a00;--acc:#eaf0ff;--fill:#eceef1;--r:8px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--t1);font:14px/20px system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:1600px;margin:0 auto;padding:20px 20px 80px}
+h1{font-size:24px;line-height:30px;margin:0}
+.summary{color:var(--t2);margin:4px 0 0}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-start}
+.topr{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:flex-end}
+section{margin-top:24px}
+h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
+.cap{color:var(--t3);font-size:12px;margin:0 0 10px}
+.small{font-size:12px;line-height:16px;color:var(--t3)}
+.row{display:flex;flex-wrap:wrap;gap:12px}
+.load{flex:1 1 220px;border:1px solid var(--bd);border-radius:12px;padding:16px;background:var(--bg)}
+.colwrap{flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.colwrap>.col{flex:1 1 auto}
+.load.cmp{flex:none;padding:10px 14px}
+.load.spacer{visibility:hidden}
+.load{position:relative}
+.bar>div.mseg{background:#7b93c9;border-radius:999px 0 0 999px}
+.bar>div.mseg+div{border-radius:0 999px 999px 0}
+.mt{cursor:pointer;display:flex;align-items:center;gap:6px;height:16px}
+.mt:hover{color:var(--t2);text-decoration:underline}
+.msw{width:8px;height:8px;border-radius:2px;background:#7b93c9;display:inline-block}
+.mlist{position:absolute;left:8px;right:8px;top:calc(100% - 4px);z-index:50;background:var(--elev);border:1px solid var(--bd);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.14);padding:6px 10px;font-size:12px;line-height:18px;color:var(--t1)}
+.mgrp{margin-bottom:10px}
+.mblk{display:block;color:inherit;text-decoration:none;background:#eef2fa;border:1px solid #d5ddef;border-left:4px solid #7b93c9;border-radius:var(--r);padding:8px 12px;margin-bottom:6px;cursor:pointer}
+.mblk:hover{border-color:#7b93c9}
+.mblk.tent{background:#f7f9fd;border:1px dashed #9fb1d8;border-left:4px dashed #9fb1d8;opacity:.75}
+.mblk.tent:hover{opacity:1}
+.tlbl{font-size:10px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:#6a7fae;border:1px dashed #9fb1d8;border-radius:4px;padding:0 4px;margin-left:4px;vertical-align:1px}
+.ext{visibility:hidden;color:#3d5a99}
+.mblk:hover .ext,.mli:hover .ext{visibility:visible}
+.mli{display:block;color:inherit;text-decoration:none;padding:2px 0;overflow-wrap:anywhere;cursor:pointer}
+.mli:hover{color:#3d5a99}
+.mli.tent{opacity:.7}
+.mblk.zero{padding:2px 12px;font-size:12px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mall{display:block;color:#3d5a99;text-decoration:none;background:#e4eaf6;border-radius:999px;font-size:11px;line-height:16px;padding:1px 10px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.mall:hover .ext{visibility:visible}
+.addb{border:1px solid var(--bd);background:var(--bg);color:var(--t2);border-radius:6px;font:600 16px/20px inherit;font-family:inherit;width:26px;height:26px;padding:0;margin-left:6px;vertical-align:4px;cursor:pointer}
+.addb:hover{border-color:var(--focus);color:var(--t1)}
+.mblk .mtop{display:flex;justify-content:space-between;gap:8px}
+.mblk .mtime2{font-size:12px;font-weight:600;color:#3d5a99;font-variant-numeric:tabular-nums}
+.mblk .mtitle{font-weight:500;overflow-wrap:anywhere}
+.mlist>div{padding:2px 0;overflow-wrap:anywhere}
+.mtime{color:var(--t3);display:inline-block;min-width:92px;font-variant-numeric:tabular-nums}
+@media (max-width:611px){.load.spacer{display:none}}
+.load.cmp .metric{font-size:22px;line-height:28px;margin:2px 0 4px}
+.load.cmp .bar{height:10px}
+.load .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.metric{font-size:28px;line-height:34px;font-weight:600;margin:6px 0 10px}
+.bar{height:16px;border-radius:999px;background:var(--fill);overflow:hidden}
+.bar>div{height:100%;border-radius:999px;background:var(--ok)}
+.chip{border:1px solid var(--bd);background:var(--bg);color:var(--t2);border-radius:999px;font:inherit;padding:6px 14px;cursor:pointer}
+.chip.on{border-color:var(--focus);background:var(--acc);color:var(--t1);font-weight:600}
+.btn{border:1px solid var(--bd);background:var(--bg);color:var(--t2);border-radius:6px;font:12px/18px inherit;font-family:inherit;padding:0 7px;cursor:pointer}
+.btn:hover{border-color:var(--t3)}
+.bbig{font-size:13px;line-height:20px;padding:5px 12px;border-radius:8px}
+.tog{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;color:var(--t2)}
+.tog input{display:none}
+.tog .sw{width:34px;height:20px;border-radius:999px;background:var(--fill);position:relative;transition:.15s}
+.tog .sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:.15s}
+.tog input:checked+.sw{background:var(--focus)}
+.tog input:checked+.sw::after{left:16px}
+.lane{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.col{flex:1 1 280px;min-width:0;background:var(--subtle);border:1px solid var(--bds);border-radius:12px;padding:12px;min-height:120px}
+.col.hot{background:var(--acc);border:1px dashed var(--focus)}
+.colhd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;gap:8px;flex-wrap:wrap}
+.colhd b{font-size:14px}
+.scroll{max-height:640px;overflow-y:auto;padding-right:2px}
+.grp{margin-bottom:10px}
+.grphd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;padding:4px 2px 6px;margin-bottom:6px;border-bottom:1px solid var(--bds)}
+.grphd .lbl{font-size:24px;line-height:1.2;font-weight:600;letter-spacing:.3px}
+.card{background:var(--elev);border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;cursor:grab;position:relative}
+.card.gray{background:var(--subtle);border-style:dashed;opacity:.6}
+.card.muted{opacity:.62}
+.card.drag{opacity:.45}
+.card .nm{color:var(--t1);font-weight:500;display:block;overflow-wrap:anywhere;padding-right:30px;text-decoration:none;cursor:pointer}
+.card .nm:hover{text-decoration:underline}
+.card.gray .nm{color:var(--t2)}
+.card.muted .nm{text-decoration:line-through}
+.card .dd{cursor:pointer;border-radius:4px;padding:0 2px;margin:0 -2px}
+.card .dd:hover{background:var(--fill);text-decoration:underline}
+.duepick{display:inline-flex;align-items:center;gap:4px}
+.duepick input{font:12px/18px inherit;font-family:inherit;border:1px solid var(--focus);border-radius:6px;padding:0 4px;color:var(--t1)}
+.mbg{position:fixed;inset:0;z-index:2000;background:rgba(17,20,24,.35);display:flex;justify-content:flex-end}
+.pane{width:min(560px,100%);height:100%;background:var(--elev);box-shadow:-8px 0 24px rgba(0,0,0,.18);display:flex;flex-direction:column}
+.pane .phd{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 20px;border-bottom:1px solid var(--bds)}
+.pane .pbody{flex:1;overflow-y:auto;padding:16px 20px}
+.pane .pft{display:flex;align-items:center;gap:8px;padding:12px 20px;border-top:1px solid var(--bds)}
+.pane .tname{width:100%;font:600 20px/28px inherit;font-family:inherit;color:var(--t1);border:1px solid transparent;border-radius:6px;padding:4px 6px;margin:0 -6px 12px;resize:none}
+.pane .tname:hover{border-color:var(--bd)}.pane .tname:focus,.pane textarea:focus,.pane input:focus{outline:none;border-color:var(--focus)}
+.pane .f{display:grid;grid-template-columns:110px 1fr;align-items:center;gap:8px;min-height:36px}
+.pane .f>label{color:var(--t3);font-size:13px}
+.pane input[type=date]{font:13px/20px inherit;font-family:inherit;border:1px solid var(--bd);border-radius:6px;padding:4px 6px;color:var(--t1)}
+.pane .desc{display:block;color:var(--t3);font-size:13px;margin:16px 0 6px}
+.pane textarea.notes{width:100%;min-height:260px;font:14px/20px inherit;font-family:inherit;color:var(--t1);border:1px solid var(--bd);border-radius:8px;padding:8px 10px;resize:vertical}
+.pane .note{font-size:12px;color:var(--t3);margin-top:6px}
+.pane .perr{background:#fdecea;color:#8a1c12;border:1px solid #f5c2bd;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:12px}
+.btnp{border:1px solid var(--focus);background:var(--focus);color:#fff;border-radius:8px;font:13px/20px inherit;font-family:inherit;padding:5px 14px;cursor:pointer}
+.btnp[disabled]{opacity:.6;cursor:default}
+.pane a.asana{font-size:12px;color:var(--t3);margin-left:auto}
+.dot{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;border:3px solid var(--t3);background:#fff;color:#fff;font-size:13px;line-height:18px;padding:0;text-align:center;cursor:pointer}
+.dot:hover{border-color:var(--ok)}
+.dot.on{border-color:var(--ok);background:var(--ok)}
+.meta{margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px}
+.who{margin-left:auto;display:inline-flex;gap:4px;flex-wrap:wrap}
+.ac{border:1px solid var(--bd);background:var(--bg);color:var(--t2);border-radius:999px;font:11px/16px inherit;font-family:inherit;padding:0 8px;cursor:pointer}
+.ac:hover{border-color:var(--t3)}
+.ac.on{border-color:var(--focus);background:var(--acc);color:var(--t1);font-weight:600}
+.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
+.mins{font-size:12px;font-weight:600;min-width:48px;text-align:center}
+.pill{background:#e7f6ee;color:var(--ok);border-radius:999px;padding:0 6px;font-weight:600}
+.over{color:var(--bad)}.due{color:var(--warn)}
+.empty{padding:24px 8px;text-align:center}
+.toast{position:fixed;left:16px;bottom:16px;z-index:1000;display:flex;align-items:center;gap:10px;max-width:440px;padding:8px 10px 8px 14px;background:var(--elev);border:1px solid var(--bd);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.18)}
+.toast span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;color:var(--t2);font-size:12px}
+.err{position:fixed;right:16px;bottom:16px;z-index:1001;max-width:460px;padding:10px 14px;background:#fdecea;color:#8a1c12;border:1px solid #f5c2bd;border-radius:10px;font-size:13px}
+.status{font-size:12px;color:var(--t3)}
+.spin{display:inline-block;width:10px;height:10px;border:2px solid var(--t3);border-top-color:transparent;border-radius:50%;animation:s 0.8s linear infinite;vertical-align:-1px}
+@keyframes s{to{transform:rotate(360deg)}}
+.loading{padding:60px;text-align:center;color:var(--t3)}
+/* ---------- mobile (UI only; desktop untouched above 720px) ---------- */
+.mob,.seg{display:none}
+@media (max-width:720px){
+  html{-webkit-text-size-adjust:100%}
+  body{overflow-x:hidden}
+  .dsk{display:none}
+  .mob{display:inline-flex}
+  .wrap{padding:12px max(12px,env(safe-area-inset-right)) 96px max(12px,env(safe-area-inset-left))}
+  h1{font-size:20px;line-height:26px}
+  .summary{font-size:13px}
+  .top{gap:8px}.topr{justify-content:flex-start;gap:8px 12px}
+  section{margin-top:18px}
+  .load{flex:1 1 100%;padding:12px 14px}
+  .row>.load{flex:1 1 calc(50% - 6px);padding:10px 12px}
+  .row>.load .metric{font-size:20px;line-height:26px;margin:2px 0 4px}
+  .row>.load .bar{height:10px}
+  .metric{font-size:22px;line-height:28px;margin:4px 0 6px}
+  .bbig{min-height:40px;padding:8px 14px}
+  .btn{min-height:40px;min-width:40px;padding:0 10px;font-size:13px}
+  .chip{min-height:40px;padding:8px 16px}
+  .tog{min-height:40px}
+  .mt{min-height:40px;height:auto}
+  .addb{width:40px;height:40px;font-size:20px;vertical-align:2px}
+  .ftog{align-items:center;gap:8px;min-height:40px;border:1px solid var(--bd);background:var(--bg);color:var(--t1);border-radius:8px;font:600 15px/20px inherit;font-family:inherit;padding:8px 14px;cursor:pointer}
+  .ftog .small{font-weight:400}
+  .fbody{display:none;margin-top:10px}
+  .fbody.open{display:block}
+  /* one column at a time per person, chosen with a sticky segmented control */
+  .seg{display:flex;position:sticky;top:0;z-index:40;gap:4px;padding:6px 0;margin:0 0 8px;background:var(--bg)}
+  .seg button{flex:1 1 0;min-width:0;min-height:48px;border:1px solid var(--bd);background:var(--subtle);color:var(--t2);border-radius:10px;font:600 14px/18px inherit;font-family:inherit;padding:4px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .seg button .small{font-weight:400;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .seg button.on{background:var(--acc);border-color:var(--focus);color:var(--t1)}
+  .lane{display:block}
+  .lane .colwrap{display:none}
+  .lane[data-tab=b] .colwrap[data-kind=b],.lane[data-tab=t] .colwrap[data-kind=t],.lane[data-tab=w] .colwrap[data-kind=w]{display:flex}
+  .col{padding:10px;min-height:80px}
+  .scroll{max-height:none;overflow:visible;padding-right:0}
+  .grphd .lbl{font-size:18px}
+  .card{padding:10px 12px;cursor:default}
+  .card .nm{padding-right:44px;min-height:32px}
+  .dot{top:4px;right:4px;width:40px;height:40px;border-width:8px;border-color:var(--elev);box-shadow:inset 0 0 0 3px var(--t3);line-height:22px}
+  .dot.on{border-color:var(--elev);box-shadow:none}
+  .meta{gap:4px 10px}
+  .card .dd{display:inline-flex;align-items:center;min-height:40px;padding:0 4px}
+  .duepick{flex-wrap:wrap}
+  .duepick input{min-height:40px;font-size:16px}
+  .who{margin-left:0;width:100%;gap:6px}
+  .ac{min-height:40px;padding:0 14px;font-size:13px;flex:1 1 auto}
+  .ctl{gap:6px}
+  .ctl>span[style*="flex:1"]{flex-basis:100%!important;height:0}
+  .ctl>.btn[data-act=today],.ctl>.btn[data-act=tomorrow],.ctl>.btn[data-act=back]{flex:1 1 0}
+  .mblk{padding:10px 12px}
+  .mall{line-height:22px;padding:4px 12px}
+  .mlist{left:0;right:0}
+  .mli{padding:8px 0}
+  .ext{visibility:visible}
+  /* edit panel → full-screen sheet */
+  .mbg{background:var(--elev)}
+  .pane{width:100%;height:100%;height:100dvh;box-shadow:none}
+  .pane .phd{padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top))}
+  .pane .pbody{padding:14px 16px}
+  .pane .pft{flex-wrap:wrap;padding:10px 16px;padding-bottom:max(10px,env(safe-area-inset-bottom))}
+  .pane .f{grid-template-columns:1fr;gap:4px;margin-bottom:10px}
+  .pane .tname{font-size:18px;line-height:26px}
+  .pane input[type=date],.pane textarea.notes{font-size:16px}
+  .pane input[type=date]{min-height:40px}
+  .pane textarea.notes{min-height:200px}
+  .btnp{min-height:44px;padding:10px 22px;font-size:15px}
+  .pane a.asana{display:inline-flex;align-items:center;min-height:40px}
+  .toast{left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));max-width:none}
+  .err{left:8px;right:8px;bottom:max(64px,env(safe-area-inset-bottom));max-width:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="loading"><span class="spin"></span> Loading from Asana…</div></div>
+<div id="modal"></div>
+<script>
+(function () {
+  'use strict';
+  var KEY = new URLSearchParams(location.search).get('k') || '';
+  var LINK = 'https://app.asana.com/1/1213289283868810/task/';
+  var CLIENTS = { '054': 'ADA', '061': 'CHOROGRAPHERS', '072': 'MICROMEGA', '410': 'PILA STUDIO', '620': 'MAKRIDIS ASSOCIATES', '710': 'YPDS',
+    '832': '3H', '902': '1Z', '904': 'ETSI', '906': 'STONES & WALLS', '907': 'CREATIVE ARCHITECTS', '909': 'POTIROPOULOS',
+    '914': 'DE-MI', '915': 'BBA', '916': 'SERIAL', '917': 'BONARCHI', '919': 'ARCHETOPO', '920': 'AYP' };
+
+  var S = { board: null, byId: {}, who: 'all', dueOnly: false, showDone: false, undo: [], undoTimer: null,
+    drag: null, over: null, busy: 0, err: '', errTimer: null, minTimers: {}, loading: false, dueEdit: null, ed: null, tab: {}, fOpen: false };
+
+  /* ---------- server ---------- */
+  function api(method, path, body) {
+    S.busy++; paintStatus();
+    return fetch(path + (path.indexOf('?') < 0 ? '?' : '&') + 'k=' + encodeURIComponent(KEY), {
+      method: method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      return r.json().catch(function () { return { error: 'HTTP ' + r.status }; }).then(function (j) {
+        if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+        return j;
+      });
+    }).finally(function () { S.busy--; paintStatus(); });
+  }
+  function showErr(msg) {
+    S.err = msg; clearTimeout(S.errTimer);
+    S.errTimer = setTimeout(function () { S.err = ''; render(); }, 9000);
+    render();
+  }
+  function load(force) {
+    S.loading = true; paintStatus();
+    return api('GET', '/api/board' + (force ? '?refresh=1' : '')).then(function (b) {
+      S.board = b; S.byId = {};
+      b.tasks.forEach(function (x) { S.byId[x.i] = x; });
+      S.loading = false; render();
+    }).catch(function (e) { S.loading = false; showErr('Load failed: ' + e.message); });
+  }
+
+  /* ---------- helpers ---------- */
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function hm(m) { var h = Math.floor(m / 60), r = m % 60; return h + ':' + (r < 10 ? '0' : '') + r; }
+  function fmtDate(d) { if (!d) return 'No due date'; var p = d.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+  function today() { return S.board.today; }
+  function byDue(a, b) { if (a.d && b.d) return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; if (a.d) return -1; if (b.d) return 1; return 0; }
+  function groupOf(x) {
+    var p = (x.p.split(', ')[0] || '').trim();
+    var pm = /^(\d{3})[a-z]?\s+(.+)$/.exec(p);
+    if (pm) return { k: '0' + pm[1], label: pm[1] + ' ' + (CLIENTS[pm[1]] || pm[2]) };
+    var tm = /^(\d{3})(?!\d)/.exec(x.n.trim());
+    if (tm && CLIENTS[tm[1]]) return { k: '0' + tm[1], label: tm[1] + ' ' + CLIENTS[tm[1]] };
+    if (p === 'PRE general') return { k: '1a', label: 'PRE general' };
+    if (p === 'GROK BOT' || p === 'ideas' || p === 'GROK BOT, ideas') return { k: '1b', label: 'GROK BOT & ideas' };
+    if (/private/i.test(p)) return { k: '1c', label: 'Private' };
+    if (p) return { k: '1d' + p, label: p };
+    return { k: '1z', label: 'No project' };
+  }
+  function groupTasks(items) {
+    var m = {};
+    items.forEach(function (x) { var g = groupOf(x); if (!m[g.k]) m[g.k] = { g: g, xs: [] }; m[g.k].xs.push(x); });
+    return Object.keys(m).sort().map(function (k) { return m[k]; });
+  }
+  function tasks() { return S.board.tasks; }
+  // The Asana project behind a section (for '+'): the most common first project among its tasks that
+  // belongs to the section; else a workspace project with the section's code (prefer '<code>a').
+  function sectionProject(grp) {
+    var cnt = {}, best = null;
+    grp.xs.forEach(function (x) {
+      var pn = (x.p.split(', ')[0] || '').trim();
+      if (!x.pg || !pn || groupOf({ p: pn, n: '' }).k !== grp.g.k) return;
+      var c = cnt[x.pg] = cnt[x.pg] || { g: x.pg, n: pn, c: 0 }; c.c++;
+      if (!best || c.c > best.c) best = c;
+    });
+    if (!best) {
+      var ps = S.board.projects || [], code = /^0(\d{3})$/.exec(grp.g.k);
+      var hit = code ? (ps.filter(function (p) { return p.n.indexOf(code[1] + 'a ') === 0; })[0] || ps.filter(function (p) { return new RegExp('^' + code[1] + '[a-z]?\\s').test(p.n); })[0])
+        : grp.g.k === '1a' ? ps.filter(function (p) { return p.n === 'PRE general'; })[0] : null;
+      if (hit) best = { g: hit.g, n: hit.n };
+    }
+    if (!best) return null;
+    var pm = /^(\d{3})([a-z]?)\s/.exec(best.n), cm = /^0(\d{3})$/.exec(grp.g.k);
+    var pre = pm ? pm[1] + (pm[2] || 'a') : cm ? cm[1] + 'a' : 'PRE';
+    return { g: best.g, n: best.n, pre: pre + ' ' };
+  }
+  function canTake(x, k) { return x.a === k || (x.a === 'un' && k !== 'un' && !x.c); }
+  function dueOk(x) { return !S.dueOnly || (x.d !== '' && x.d <= today()); }
+  // planned tasks counted in a lane's day: open, or completed today
+  function plannedDay(k) { return tasks().filter(function (x) { return x.t === k && (!x.c || x.c === today()); }); }
+  function sum(xs) { return xs.reduce(function (s, x) { return s + x.m; }, 0); }
+
+  /* ---------- actions ---------- */
+  function markDone(id) {
+    var x = S.byId[id]; if (!x) return;
+    if (x.c) { // completed card visible via Show completed → reopen
+      var oldC = x.c; x.c = ''; render();
+      api('POST', '/api/completed', { i: id, completed: false }).catch(function (e) { x.c = oldC; showErr('Could not reopen: ' + e.message); });
+      return;
+    }
+    x.c = today();
+    S.undo = S.undo.filter(function (u) { return u !== id; }).concat([id]);
+    armUndo(); render();
+    api('POST', '/api/completed', { i: id, completed: true }).then(function (r) { if (r.c) x.c = r.c; })
+      .catch(function (e) { x.c = ''; S.undo = S.undo.filter(function (u) { return u !== id; }); showErr('Could not complete in Asana: ' + e.message); });
+  }
+  function armUndo() { clearTimeout(S.undoTimer); S.undoTimer = setTimeout(function () { S.undo = []; render(); }, 5000); }
+  function undoLast() {
+    if (!S.undo.length) return;
+    var id = S.undo.pop(), x = S.byId[id];
+    if (S.undo.length) armUndo(); else clearTimeout(S.undoTimer);
+    if (!x) return render();
+    var oldC = x.c; x.c = ''; render();
+    api('POST', '/api/completed', { i: id, completed: false }).catch(function (e) { x.c = oldC; showErr('Undo failed: ' + e.message); });
+  }
+  function bump(id, delta) {
+    var x = S.byId[id]; if (!x) return;
+    x.m = Math.max(5, Math.min(480, x.m + delta)); x.e = 1; render();
+    clearTimeout(S.minTimers[id]);
+    S.minTimers[id] = setTimeout(function () {
+      var want = x.m;
+      api('POST', '/api/minutes', { i: id, m: want }).catch(function (e) { showErr('Minutes not saved for "' + x.n.slice(0, 40) + '": ' + e.message); });
+    }, 700);
+  }
+  // slot: 't' (Today), 'w' (Tomorrow) or '' (Backlog). A task sits in at most one of Today/Tomorrow.
+  // Untagged tasks sit in Today/Tomorrow by due date (src 'd'); re-place them after a date change.
+  function replace(x) {
+    if (!x || (x.src !== 'd' && (x.t || x.w))) return;
+    var lane = x.a;
+    x.t = x.d && x.d === S.board.today ? lane : ''; x.w = x.d && x.d === S.board.tomorrow ? lane : '';
+    x.src = x.t || x.w ? 'd' : '';
+  }
+  function slotOf(x) { return x.t ? { s: 't', k: x.t } : x.w ? { s: 'w', k: x.w } : null; }
+  function moveTo(id, slot, k) {
+    var x = S.byId[id]; if (!x) return;
+    var from = slotOf(x), to = slot ? { s: slot, k: k } : null;
+    if (to && !canTake(x, k)) return render();
+    if ((!from && !to) || (from && to && from.s === to.s && from.k === to.k)) return render();
+    var oldT = x.t, oldW = x.w, oldD = x.d, oldSrc = x.src; x.src = '';
+    x.t = slot === 't' ? k : ''; x.w = slot === 'w' ? k : '';
+    // due date follows the column (server sets it in the same call): Today = today, Tomorrow = tomorrow, Backlog = none
+    x.d = slot === 't' ? S.board.today : slot === 'w' ? S.board.tomorrow : '';
+    render();
+    api('POST', '/api/plan', { i: id, from: from, to: to }).then(function (r) { if (r && r.d !== undefined && x.d !== r.d) { x.d = r.d; render(); } }).catch(function (e) {
+      x.t = oldT; x.w = oldW; x.d = oldD; x.src = oldSrc; showErr('Could not move "' + x.n.slice(0, 40) + '": ' + e.message + ' — Refresh to see the real state.');
+    });
+  }
+  function assignChips(x, attr) {
+    return '<span class="who">' + S.board.people.filter(function (p) { return p.k !== 'un'; }).map(function (p) {
+      var on = x.a === p.k;
+      return '<button class="ac' + (on ? ' on' : '') + '" ' + attr + '="assign" data-id="' + x.i + '" data-k="' + p.k + '" aria-pressed="' + on + '" title="' +
+        (on ? 'Assigned to ' + esc(p.name) + ' — click to unassign' : 'Assign to ' + esc(p.name)) + '">' + esc(p.name) + '</button>';
+    }).join('') + '</span>';
+  }
+  // Clicking the current assignee unassigns; another name reassigns. A planned task keeps its column under the new person.
+  function assign(id, k) {
+    var x = S.byId[id]; if (!x) return Promise.resolve();
+    var newA = x.a === k ? 'un' : k, from = slotOf(x), old = { a: x.a, t: x.t, w: x.w };
+    x.a = newA; if (x.t) x.t = newA; if (x.w) x.w = newA; render();
+    return api('POST', '/api/assign', { i: id, a: newA, from: from }).catch(function (e) {
+      x.a = old.a; x.t = old.t; x.w = old.w; showErr('Could not reassign "' + x.n.slice(0, 40) + '": ' + e.message + ' — Refresh to see the real state.');
+      throw e;
+    });
+  }
+  function toToday(id, k) { moveTo(id, 't', k); }
+  function toTomorrow(id, k) { moveTo(id, 'w', k); }
+  function toBacklog(id) { moveTo(id, '', ''); }
+  function clearToday() {
+    var list = tasks().filter(function (x) { return x.t && (S.who === 'all' || x.t === S.who); });
+    if (!list.length) return;
+    if (!confirm('Clear Today for ' + (S.who === 'all' ? 'everyone' : nameOf(S.who)) + ' (' + list.length + ' tasks)?')) return;
+    var entries = list.map(function (x) { return { i: x.i, t: x.t }; });
+    list.forEach(function (x) { x.t = ''; }); render();
+    api('POST', '/api/clear-today', { entries: entries }).then(function (r) {
+      if (r.failed && r.failed.length) showErr(r.failed.length + ' tasks could not be cleared; Refresh to see them.');
+    }).catch(function (e) { showErr('Clear failed: ' + e.message + ' — Refresh to see the real state.'); });
+  }
+  function nameOf(k) { var p = S.board.people.filter(function (p) { return p.k === k; })[0]; return p ? p.name : k; }
+
+  /* ---------- render ---------- */
+  function toggle(id, label, on) {
+    return '<label class="tog"><input type="checkbox" data-tog="' + id + '"' + (on ? ' checked' : '') + '><span class="sw"></span><span>' + esc(label) + '</span></label>';
+  }
+  function card(x, kind, k) {
+    var done = !!x.c, gray = x.a === 'un' && k !== 'un';
+    var overdue = !done && x.d !== '' && x.d < today(), dueToday = !done && x.d === today();
+    var cls = 'card' + (gray ? ' gray' : '') + (done ? ' muted' : '') + (S.drag === x.i ? ' drag' : '');
+    var dueEditing = S.dueEdit === x.i && !done;
+    var h = '<div class="' + cls + '" draggable="' + (dueEditing ? 'false' : 'true') + '" data-id="' + x.i + '">';
+    h += '<button class="dot' + (done ? ' on' : '') + '" data-act="done" data-id="' + x.i + '" title="' + (done ? 'Reopen in Asana' : 'Mark complete in Asana') + '" aria-label="' + (done ? 'Reopen' : 'Mark done') + '">' + (done ? '✓' : '') + '</button>';
+    h += '<span class="nm" role="button" tabindex="0" data-open="' + x.i + '" title="Open task">' + esc(x.n) + '</span>';
+    h += '<div class="meta small">';
+    if (gray) h += '<span style="color:var(--t2);font-weight:600">Unassigned</span>';
+    if (done) h += '<span class="pill">✓ Completed ' + fmtDate(x.c) + '</span>';
+    if (x.p) h += '<span>' + esc(x.p) + '</span>';
+    if (x.par) h += '<span>↳ ' + esc(x.par) + '</span>';
+    var dueTxt = (overdue ? 'Overdue · ' : dueToday ? 'Due today · ' : '') + fmtDate(x.d);
+    if (dueEditing) h += '<span class="duepick"><input type="date" data-due-input="' + x.i + '" value="' + esc(x.d) + '" aria-label="Due date">' +
+      (x.d ? '<button class="btn" data-act="dueclear" data-id="' + x.i + '">Clear</button>' : '') + '<button class="btn" data-act="duecancel" data-id="' + x.i + '" aria-label="Close">✕</button></span>';
+    else h += '<span class="dd ' + (overdue ? 'over' : dueToday ? 'due' : '') + '" data-act="due" data-id="' + x.i + '" role="button" tabindex="0" title="Change due date">' + dueTxt + '</span>';
+    h += assignChips(x, 'data-act');
+    h += '</div><div class="ctl">';
+    h += '<button class="btn" data-act="bump" data-d="-5" data-id="' + x.i + '" aria-label="Minus 5 minutes">−5</button>';
+    h += '<span class="mins">' + x.m + ' min</span>';
+    h += '<button class="btn" data-act="bump" data-d="5" data-id="' + x.i + '" aria-label="Plus 5 minutes">+5</button>';
+    h += '<button class="btn" data-act="bump" data-d="15" data-id="' + x.i + '" aria-label="Plus 15 minutes">+15</button>';
+    if (!x.e && !done) h += '<span class="small">no estimate</span>';
+    h += '<span style="flex:1"></span>';
+    var tk = kind === 'b' ? k : (x.t || x.w || k);
+    var bToday = '<button class="btn" data-act="today" data-id="' + x.i + '" data-k="' + tk + '">Today →</button>';
+    var bTom = '<button class="btn" data-act="tomorrow" data-id="' + x.i + '" data-k="' + tk + '">Tomorrow →</button>';
+    var bBack = '<button class="btn" data-act="back" data-id="' + x.i + '">← Backlog</button>';
+    if (!done) {
+      if (kind === 't') h += bTom + bBack;
+      else if (kind === 'w') h += bToday.replace('Today →', '← Today') + bBack;
+      else if (canTake(x, k)) h += bToday + bTom;
+    }
+    return h + '</div></div>';
+  }
+  // Calendar events shown as blocks at the top of a Today/Tomorrow column (title, times, link only).
+  function meetingBlocks(mt) {
+    if (!mt || !mt.list || !(mt.list.length || (mt.allday || []).length)) return '';
+    var h = '<div class="mgrp"><div class="grphd"><span class="small" style="font-weight:600;color:var(--t2)"><span class="msw"></span> Calendar · ' + mt.n + ' · ' + hm(mt.min) +
+      (mt.nt ? '<span style="font-weight:400"> + ' + mt.nt + ' tentative</span>' : '') + '</span></div>';
+    (mt.allday || []).forEach(function (x) {
+      h += '<a class="mall" href="' + esc(x.link || '#') + '" target="_blank" rel="noreferrer" title="All day (not counted) · open in Google Calendar">' + esc(x.title) + '<span class="ext"> ↗</span></a>';
+    });
+    mt.list.forEach(function (x) {
+      var d = Math.round((Date.parse(x.e) - Date.parse(x.s)) / 60000);
+      if (!d) { // zero-length: compact, start time only
+        h += '<a class="mblk zero' + (x.tent ? ' tent' : '') + '" href="' + esc(x.link || '#') + '" target="_blank" rel="noreferrer" title="Open in Google Calendar"><span class="mtime2">' + tAth(x.s) + '</span> ' + esc(x.title) +
+          (x.tent ? ' <span class="tlbl">tentative</span>' : '') + '<span class="ext"> ↗</span></a>';
+        return;
+      }
+      h += '<a class="mblk' + (x.tent ? ' tent' : '') + '" href="' + esc(x.link || '#') + '" target="_blank" rel="noreferrer" title="Open in Google Calendar' + (x.tent ? ' (tentative, not counted)' : '') + '">' +
+        '<div class="mtop"><span class="mtime2">' + tAth(x.s) + '–' + tAth(x.e) + (x.tent ? ' <span class="tlbl">tentative</span>' : '') + '</span><span class="small">' + hm(d) + '<span class="ext"> ↗</span></span></div><div class="mtitle">' + esc(x.title) + '</div></a>';
+    });
+    return h + '</div>';
+  }
+  function column(k, kind, title, items, total, extra, mt) {
+    extra = extra || [];
+    var zone = k + kind;
+    var h = '<div class="col' + (S.over === zone ? ' hot' : '') + '" data-zone="' + zone + '" data-k="' + k + '" data-kind="' + kind + '">';
+    h += '<div class="colhd"><b>' + title + '</b><span class="small">' + items.length + (items.length === 1 ? ' task' : ' tasks') + ' · ' + hm(total) + '</span></div><div class="scroll">';
+    h += meetingBlocks(mt);
+    groupTasks(items.concat(extra)).forEach(function (grp) {
+      var own = grp.xs.filter(function (x) { return x.a === k; }), un = grp.xs.filter(function (x) { return x.a !== k; });
+      var sp = sectionProject(grp);
+      var add = sp ? ' <button class="addb" data-act="new" data-k="' + k + '" data-kind="' + kind + '" data-pg="' + esc(sp.g) + '" data-pn="' + esc(sp.n) + '" data-pre="' + esc(sp.pre) +
+        '" title="New task in ' + esc(sp.n) + '" aria-label="New task in ' + esc(sp.n) + '">+</button>' : '';
+      h += '<div class="grp"><div class="grphd"><span class="lbl">' + esc(grp.g.label) + add + '</span><span class="small">' + own.length + ' · ' + hm(sum(own)) +
+        (un.length ? '<span style="opacity:.8">  + ' + un.length + ' unassigned · ' + hm(sum(un)) + '</span>' : '') + '</span></div>';
+      own.forEach(function (x) { h += card(x, kind, k); });
+      un.forEach(function (x) { h += card(x, kind, k); });
+      h += '</div>';
+    });
+    if (!items.length && kind === 't') h += '<div class="small empty">Drag tasks here or press Today →</div>';
+    if (!items.length && kind === 'w') h += '<div class="small empty">Drag tasks here or press Tomorrow →</div>';
+    return h + '</div></div>';
+  }
+  // Load card (top 'Today's load' and the per-lane counters). m = minutes counted against the 8h cap.
+  // Calendar events for person k on day 'today' | 'tomorrow': {min,n,list} | {nc} | {err} | null (no calendar slot).
+  function meetFor(k, day) {
+    var M = S.board.meet && S.board.meet[k]; if (!M) return null;
+    if (M.nc || M.err) return M;
+    return M[day] || null;
+  }
+  function tAth(iso) { return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Athens' }); }
+  function meetLine(mt, key) {
+    if (!mt) return '';
+    if (mt.nc) return '<div class="small" style="opacity:.75">calendar not connected</div>';
+    if (mt.err) return '<div class="small" style="opacity:.75">calendar unavailable</div>';
+    var span = function (x) { return x.s === x.e ? tAth(x.s) : tAth(x.s) + '–' + tAth(x.e); };
+    var all = mt.allday || [], items = all.length + mt.list.length;
+    var tip = all.map(function (x) { return 'All day  ' + x.title; }).concat(mt.list.map(function (x) { return span(x) + '  ' + x.title + (x.tent ? '  (tentative)' : ''); })).join('\n') || 'No calendar events';
+    var h = '<div class="small mt" data-act="meet" data-mk="' + esc(key) + '" title="' + esc(tip) + '" role="button" tabindex="0"><span class="msw"></span>calendar ' + hm(mt.min) + ' (' + mt.n + ')' +
+      (mt.nt ? ' + ' + mt.nt + ' tentative' : '') + (items ? ' ▾' : '') + '</div>';
+    if (S.meetOpen === key && items) h += '<div class="mlist">' + all.map(function (x) {
+      return '<a class="mli" href="' + esc(x.link || '#') + '" target="_blank" rel="noreferrer" title="All day, not counted"><span class="mtime">All day</span>' + esc(x.title) + '<span class="ext"> ↗</span></a>';
+    }).join('') + mt.list.map(function (x) {
+      return '<a class="mli' + (x.tent ? ' tent' : '') + '" href="' + esc(x.link || '#') + '" target="_blank" rel="noreferrer" title="Open in Google Calendar"><span class="mtime">' + span(x) + '</span>' + esc(x.title) +
+        (x.tent ? ' <span class="tlbl">tentative</span>' : '') + '<span class="ext"> ↗</span></a>';
+    }).join('') + '</div>';
+    return h;
+  }
+  function loadCard(label, taskMin, doneMin, extraCls, mt, key) {
+    var cap = S.board.cap, meetMin = mt && mt.min ? mt.min : 0, m = taskMin + meetMin, overCap = m > cap, pct = Math.min(100, m / cap * 100);
+    var mPct = Math.min(100, meetMin / cap * 100), tPct = Math.max(0, pct - mPct);
+    var h = '<div class="load' + (extraCls ? ' ' + extraCls : '') + '"><div class="hd"><span style="color:var(--t2)">' + esc(label) + '</span><span class="small' + (overCap ? ' over' : '') + '">' + (overCap ? 'Over by ' + hm(m - cap) : hm(Math.max(0, cap - m)) + ' free') + '</span></div>';
+    h += '<div class="metric' + (overCap ? ' over' : '') + '">' + hm(m) + ' <span style="font-size:14px;color:var(--t3);font-weight:400">/ 8:00</span></div>';
+    h += '<div class="small">done ' + hm(doneMin) + '</div>' + meetLine(mt, key);
+    return h + '<div class="bar" style="margin-top:6px;display:flex">' + (mPct ? '<div class="mseg" style="width:' + mPct + '%;' + (overCap ? 'background:#f1a7a0' : '') + '"></div>' : '') +
+      '<div style="width:' + tPct + '%;' + (overCap ? 'background:var(--bad)' : '') + '"></div></div></div>';
+  }
+  function statusHtml() {
+    if (!S.board) return '';
+    var t = new Date(S.board.loadedAt);
+    return (S.busy ? '<span class="spin"></span> Saving… ' : '') + 'Loaded ' + t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Athens' }) + ' Athens';
+  }
+  function paintStatus() { var el = document.getElementById('status'); if (el) el.innerHTML = S.loading ? '<span class="spin"></span> Refreshing…' : statusHtml(); }
+
+  function render() {
+    var app = document.getElementById('app');
+    if (!S.board) { app.innerHTML = '<div class="loading">' + (S.err ? esc(S.err) + ' <button class="btn bbig" data-act="refresh">Try again</button>' : '<span class="spin"></span> Loading from Asana…') + '</div>'; return; }
+    var scrolls = [].map.call(document.querySelectorAll('.scroll'), function (e) { return e.scrollTop; });
+    var people = S.board.people, cap = S.board.cap, T = today();
+    var h = '<div class="top"><div><h1>Team day planner</h1><p class="summary">Every open Asana task per person, with minutes. Changes write straight to Asana.</p></div>';
+    h += '<div class="topr"><span class="status" id="status">' + statusHtml() + '</span><button class="btn bbig" data-act="refresh">↻ Refresh</button>' + toggle('showDone', 'Show completed', S.showDone) + '</div></div>';
+
+    h += '<section><h2>Today\'s load</h2><p class="cap">Planned minutes against an 8-hour (480 min) day</p><div class="row">';
+    people.forEach(function (p) {
+      var day = plannedDay(p.k);
+      h += loadCard(p.name, sum(day), sum(day.filter(function (x) { return x.c; })), '', meetFor(p.k, 'today'), 'top-' + p.k);
+    });
+    h += '</div></section>';
+
+    h += '<section><h2><span class="dsk">Filters</span><button class="ftog mob" data-act="ftog" aria-expanded="' + S.fOpen + '">Filters ' + (S.fOpen ? '▴' : '▾') +
+      (S.dueOnly ? ' <span class="small">· due/overdue only</span>' : '') + '</button></h2><div class="fbody' + (S.fOpen ? ' open' : '') + '"><div class="row" style="gap:16px;align-items:center">' + toggle('dueOnly', 'Only due today or overdue', S.dueOnly) +
+      '<button class="btn bbig" data-act="clear">Clear Today' + (S.who === 'all' ? '' : ' (' + esc(nameOf(S.who)) + ')') + '</button></div></div></section>';
+
+    h += '<section><h2>People</h2><div class="row" style="gap:8px">';
+    [{ k: 'all', name: 'All' }].concat(people).forEach(function (p) { h += '<button class="chip' + (S.who === p.k ? ' on' : '') + '" data-act="who" data-k="' + p.k + '">' + esc(p.name) + '</button>'; });
+    h += '</div></section>';
+
+    people.filter(function (p) { return S.who === 'all' || p.k === S.who; }).forEach(function (p) {
+      var mine = tasks().filter(function (x) { return x.a === p.k; });
+      var openN = mine.filter(function (x) { return !x.c; }).length, doneN = mine.length - openN;
+      var free = mine.filter(function (x) { return !x.t && !x.w; });
+      var backOpen = free.filter(function (x) { return !x.c && dueOk(x); }).sort(byDue);
+      var backDone = S.showDone ? free.filter(function (x) { return x.c; }).sort(function (a, b) { return a.c < b.c ? 1 : a.c > b.c ? -1 : 0; }) : [];
+      var back = backOpen.concat(backDone);
+      var todayItems = tasks().filter(function (x) { return x.t === p.k && (!x.c || S.showDone); });
+      var tomItems = tasks().filter(function (x) { return x.w === p.k && (!x.c || S.showDone); });
+      var gray = p.k === 'un' ? [] : tasks().filter(function (x) { return x.a === 'un' && !x.c && !x.t && !x.w && dueOk(x); }).sort(byDue);
+      var day = plannedDay(p.k), tomAll = tasks().filter(function (x) { return x.w === p.k; });
+      var mtT = meetFor(p.k, 'today'), mtW = meetFor(p.k, 'tomorrow');
+      var cntToday = loadCard('Today', sum(day), sum(day.filter(function (x) { return x.c; })), 'cmp', mtT, 't-' + p.k);
+      var cntTom = loadCard('Tomorrow', sum(tomAll.filter(function (x) { return !x.c; })), sum(tomAll.filter(function (x) { return x.c; })), 'cmp', mtW, 'w-' + p.k);
+      // spacer above Backlog: an invisible copy of a counter, so the three columns line up exactly
+      var cntSpacer = loadCard('Backlog', 0, 0, 'cmp spacer', mtT, 'spacer');
+      var tab = S.tab[p.k] || 't';
+      var segB = function (kd, lbl, n, min) { return '<button data-act="mtab" data-k="' + p.k + '" data-kind="' + kd + '" class="' + (tab === kd ? 'on' : '') + '" aria-pressed="' + (tab === kd) + '">' + lbl + '<span class="small">' + n + ' · ' + hm(min) + '</span></button>'; };
+      h += '<section><h2>' + esc(p.name) + ' · ' + openN + ' open' + (S.showDone ? ' · ' + doneN + ' completed in 14 days' : '') + '</h2>';
+      h += '<div class="seg" role="group" aria-label="' + esc(p.name) + ' columns">' + segB('b', 'Backlog', back.length, sum(back)) + segB('t', 'Today', todayItems.length, sum(day)) + segB('w', 'Tomorrow', tomItems.length, sum(tomItems.filter(function (x) { return !x.c; }))) + '</div>';
+      h += '<div class="lane" data-tab="' + tab + '">';
+      h += '<div class="colwrap" data-kind="b">' + cntSpacer + column(p.k, 'b', 'Backlog', back, sum(back), gray) + '</div>';
+      h += '<div class="colwrap" data-kind="t">' + cntToday + column(p.k, 't', 'Today', todayItems, sum(plannedDay(p.k)), null, mtT) + '</div>';
+      h += '<div class="colwrap" data-kind="w">' + cntTom + column(p.k, 'w', 'Tomorrow', tomItems, sum(tomItems.filter(function (x) { return !x.c; })), null, mtW) + '</div>';
+      h += '</div></section>';
+    });
+
+    if (S.undo.length) {
+      var last = S.byId[S.undo[S.undo.length - 1]];
+      h += '<div class="toast"><span>Done: ' + esc(last ? last.n : '') + '</span><button class="btn bbig" data-act="undo">' + (S.undo.length > 1 ? 'Undo (' + S.undo.length + ')' : 'Undo') + '</button></div>';
+    }
+    if (S.err) h += '<div class="err">' + esc(S.err) + '</div>';
+    app.innerHTML = h;
+    [].forEach.call(document.querySelectorAll('.scroll'), function (e, i) { if (scrolls[i]) e.scrollTop = scrolls[i]; });
+    if (S.dueEdit && S.dueFocus) {
+      S.dueFocus = false;
+      var di = document.querySelector('[data-due-input="' + S.dueEdit + '"]');
+      if (di) { di.focus(); try { di.showPicker(); } catch (er) { /* not supported / no gesture */ } }
+    }
+  }
+
+  /* ---------- inline due date ---------- */
+  function openDue(id) { S.dueEdit = id; S.dueFocus = true; render(); }
+  function closeDue() { if (S.dueEdit) { S.dueEdit = null; render(); } }
+  function saveDue(id, d) {
+    var x = S.byId[id]; S.dueEdit = null;
+    if (!x || d === x.d) return render();
+    var old = { d: x.d, t: x.t, w: x.w, src: x.src }; x.d = d; replace(x); render();
+    api('POST', '/api/task/' + id, { due_on: d }).then(function (r) { x.d = r.d; replace(x); render(); })
+      .catch(function (e) { x.d = old.d; x.t = old.t; x.w = old.w; x.src = old.src; showErr('Due date not saved: ' + e.message); });
+  }
+
+  /* ---------- task editor (Asana-style side pane) ---------- */
+  var modal = document.getElementById('modal');
+  function openEditor(id) {
+    var x = S.byId[id]; if (!x) return;
+    S.dueEdit = null;
+    S.ed = { id: id, loading: true, data: null, err: '', saving: false };
+    paintEditor();
+    api('GET', '/api/task/' + id).then(function (t) {
+      if (!S.ed || S.ed.id !== id) return;
+      S.ed.loading = false; S.ed.data = t; paintEditor();
+      var n = modal.querySelector('.tname'); if (n) n.focus();
+    }).catch(function (e) { if (S.ed && S.ed.id === id) { S.ed.loading = false; S.ed.err = 'Could not load from Asana: ' + e.message; paintEditor(); } });
+  }
+  // '+' on a section: the same pane in 'new task' mode (nothing is sent until Save).
+  function openNew(b) {
+    var k = b.getAttribute('data-k'), kind = b.getAttribute('data-kind');
+    S.dueEdit = null;
+    S.ed = { id: '', isNew: true, loading: false, err: '', saving: false,
+      ctx: { pg: b.getAttribute('data-pg'), kind: kind, k: k, pre: b.getAttribute('data-pre') },
+      data: { n: b.getAttribute('data-pre'), notes: 'D10M\n', d: kind === 't' ? S.board.today : kind === 'w' ? S.board.tomorrow : '', a: k === 'un' ? 'un' : k, p: b.getAttribute('data-pn'), par: '' } };
+    paintEditor();
+    var n = modal.querySelector('.tname'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+  }
+  function closeEditor() { if (!S.ed || S.ed.saving) return; S.ed = null; modal.innerHTML = ''; }
+  function paintEditor() {
+    var E = S.ed; if (!E) { modal.innerHTML = ''; return; }
+    var x = S.byId[E.id] || {}, t = E.data;
+    var h = '<div class="mbg" data-mbg="1"><div class="pane" role="dialog" aria-modal="true" aria-label="Edit task">';
+    h += '<div class="phd"><span class="small">' + (E.isNew ? 'New task' + (E.ctx.kind === 't' ? ' · Today' : E.ctx.kind === 'w' ? ' · Tomorrow' : '') : t && t.completed ? '✓ Completed task' : 'Task') + '</span><button class="btn bbig" data-ed="cancel" aria-label="Close">✕</button></div><div class="pbody">';
+    if (E.err) h += '<div class="perr">' + esc(E.err) + '</div>';
+    if (E.loading) h += '<div class="loading" style="padding:30px"><span class="spin"></span> Loading from Asana…</div>';
+    else if (t) {
+      h += '<textarea class="tname" rows="2" aria-label="Task name">' + esc(t.n) + '</textarea>';
+      h += '<div class="f"><label>Assignee</label><span>' + assignChips({ i: E.id, a: t.a }, 'data-ed').replace('class="who"', 'class="who" style="margin-left:0"') +
+        (t.a === 'un' ? ' <span class="small">Unassigned</span>' : t.a === 'other' ? ' <span class="small">' + esc(t.assignee) + '</span>' : '') + '</span></div>';
+      h += '<div class="f"><label for="ed-due">Due date</label><span><input type="date" id="ed-due" value="' + esc(t.d) + '"> <button class="btn" data-ed="nodue">Clear</button>' +
+        (t.due_at ? ' <span class="small">has a time in Asana; saving a new date drops the time</span>' : '') + '</span></div>';
+      h += '<div class="f"><label>Projects</label><span>' + esc(t.p || '—') + (t.par ? '<br><span class="small">↳ subtask of ' + esc(t.par) + '</span>' : '') + '</span></div>';
+      h += '<label class="desc" for="ed-notes">Description</label><textarea class="notes" id="ed-notes">' + esc(t.notes) + '</textarea>';
+      h += '<div class="note">First line is the duration code (e.g. D10M, D1H30M). If it is missing on save, D10M is added.' +
+        (t.rich ? ' <b>This description has formatting in Asana; changing it here saves it as plain text.</b>' : '') + '</div>';
+    }
+    h += '</div><div class="pft">';
+    h += '<button class="btnp" data-ed="save"' + (E.loading || !t || E.saving ? ' disabled' : '') + '>' + (E.saving ? '<span class="spin" style="border-color:#fff;border-top-color:transparent"></span> Saving…' : 'Save') + '</button>';
+    h += '<button class="btn bbig" data-ed="cancel"' + (E.saving ? ' disabled' : '') + '>Cancel</button>';
+    if (!E.isNew) h += '<a class="asana" href="' + esc((t && t.link) || LINK + E.id) + '" target="_blank" rel="noreferrer">Open in Asana ↗</a>';
+    h += '</div></div></div>';
+    // keep typed values across repaints (e.g. saving state / error)
+    var keep = E.data && modal.querySelector('.tname') ? readEditor() : null;
+    modal.innerHTML = h;
+    if (keep) { modal.querySelector('.tname').value = keep.name; modal.querySelector('#ed-notes').value = keep.notes; modal.querySelector('#ed-due').value = keep.due_on; }
+  }
+  function edAssign(k) {
+    var E = S.ed; if (!E || !E.data || E.saving || E.assigning) return;
+    if (E.isNew) { E.data.a = E.data.a === k ? 'un' : k; return paintEditor(); }
+    var x = S.byId[E.id];
+    E.assigning = true; E.err = '';
+    var done = function (a) { E.assigning = false; if (S.ed === E) { E.data.a = a; E.data.assignee = a === 'un' ? '' : nameOf(a); paintEditor(); } };
+    if (x) assign(E.id, k).then(function () { done(x.a); }).catch(function (e) { E.assigning = false; E.err = 'Not reassigned: ' + e.message; paintEditor(); });
+    else { var newA = E.data.a === k ? 'un' : k; api('POST', '/api/assign', { i: E.id, a: newA, from: null }).then(function () { done(newA); }).catch(function (e) { E.assigning = false; E.err = 'Not reassigned: ' + e.message; paintEditor(); }); }
+  }
+  function readEditor() {
+    return { name: modal.querySelector('.tname').value, notes: modal.querySelector('#ed-notes').value, due_on: modal.querySelector('#ed-due').value };
+  }
+  function saveEditor() {
+    var E = S.ed; if (!E || !E.data || E.saving) return;
+    var v = readEditor(), t = E.data, body = {};
+    var nm = v.name.replace(/[\r\n]+/g, ' ').trim();
+    if (!nm) { E.err = 'Name cannot be empty.'; return paintEditor(); }
+    if (E.isNew) return saveNew(E, v, nm);
+    if (nm !== t.n) body.name = nm;
+    if (v.notes.replace(/\r\n?/g, '\n') !== t.notes.replace(/\r\n?/g, '\n')) body.notes = v.notes;
+    if (v.due_on !== t.d) body.due_on = v.due_on;
+    if (!Object.keys(body).length) return closeEditor();
+    E.saving = true; E.err = ''; paintEditor();
+    api('POST', '/api/task/' + E.id, body).then(function (r) {
+      var x = S.byId[r.i];
+      if (x) { x.n = r.n; x.d = r.d; x.m = r.m; x.e = r.e; replace(x); }
+      E.saving = false; S.ed = null; modal.innerHTML = ''; render();
+    }).catch(function (e) { E.saving = false; E.err = 'Not saved: ' + e.message; paintEditor(); });
+  }
+  function saveNew(E, v, nm) {
+    if (/^(\d{3}[a-z]?|PRE)$/i.test(nm)) { E.err = 'Type a task name after ' + nm + '.'; return paintEditor(); }
+    var a = E.data.a, c = E.ctx, slotK = a !== 'un' ? a : c.k;
+    var body = { name: nm, notes: v.notes, due_on: v.due_on, project: c.pg, a: a, slot: c.kind === 't' || c.kind === 'w' ? { s: c.kind, k: slotK } : null };
+    E.saving = true; E.err = ''; paintEditor();
+    api('POST', '/api/task', body).then(function (x) {
+      E.saving = false; S.ed = null; modal.innerHTML = '';
+      S.board.tasks.push(x); S.byId[x.i] = x; render();
+      if (!x.tagged) showErr('Task created, but it could not be added to ' + (c.kind === 't' ? 'Today' : 'Tomorrow') + '; it is in the Backlog.');
+    }).catch(function (e) { E.saving = false; E.err = 'Not created: ' + e.message; paintEditor(); });
+  }
+  modal.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-ed]');
+    if (b) { var a = b.getAttribute('data-ed'); if (a === 'save') saveEditor(); else if (a === 'cancel') closeEditor(); else if (a === 'nodue') modal.querySelector('#ed-due').value = '';
+      else if (a === 'assign') edAssign(b.getAttribute('data-k'));
+      return; }
+    if (e.target.getAttribute('data-mbg')) closeEditor();
+  });
+  modal.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveEditor(); }
+    else if (e.key === 'Enter' && e.target.classList.contains('tname')) e.preventDefault();
+  });
+
+  /* ---------- events ---------- */
+  document.addEventListener('click', function (e) {
+    if (modal.contains(e.target)) return;
+    if (S.meetOpen && !e.target.closest('.mlist,[data-act=meet]')) { S.meetOpen = null; render(); }
+    var b = e.target.closest('[data-act]');
+    if (!b) {
+      if (e.target.closest('.duepick')) return;
+      var c = e.target.closest('.card');
+      if (c && !e.target.closest('button,input,a')) openEditor(c.getAttribute('data-id'));
+      else if (S.dueEdit && !c) closeDue();
+      return;
+    }
+    var id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+    if (act === 'due') openDue(id);
+    else if (act === 'dueclear') saveDue(id, '');
+    else if (act === 'duecancel') closeDue();
+    else if (act === 'done') markDone(id);
+    else if (act === 'bump') bump(id, Number(b.getAttribute('data-d')));
+    else if (act === 'today') toToday(id, b.getAttribute('data-k'));
+    else if (act === 'tomorrow') toTomorrow(id, b.getAttribute('data-k'));
+    else if (act === 'assign') assign(id, b.getAttribute('data-k')).catch(function () {});
+    else if (act === 'back') toBacklog(id);
+    else if (act === 'who') { S.who = b.getAttribute('data-k'); render(); }
+    else if (act === 'undo') undoLast();
+    else if (act === 'clear') clearToday();
+    else if (act === 'refresh') load(true);
+    else if (act === 'new') openNew(b);
+    else if (act === 'mtab') { S.tab[b.getAttribute('data-k')] = b.getAttribute('data-kind'); render(); }
+    else if (act === 'ftog') { S.fOpen = !S.fOpen; render(); }
+    else if (act === 'meet') { S.meetOpen = S.meetOpen === b.getAttribute('data-mk') ? null : b.getAttribute('data-mk'); render(); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { if (S.ed) closeEditor(); else closeDue(); return; }
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute) {
+      var o = e.target.getAttribute('data-open'); if (o) { e.preventDefault(); openEditor(o); return; }
+      if (e.target.getAttribute('data-act') === 'due') { e.preventDefault(); openDue(e.target.getAttribute('data-id')); }
+      if (e.target.getAttribute('data-act') === 'meet') { e.preventDefault(); e.target.click(); }
+    }
+  });
+  document.addEventListener('change', function (e) {
+    var di = e.target.getAttribute && e.target.getAttribute('data-due-input');
+    if (di) { var v = e.target.value; if (!v || /^(19|20)\d\d-\d\d-\d\d$/.test(v)) saveDue(di, v); return; }
+    var t = e.target.getAttribute && e.target.getAttribute('data-tog'); if (!t) return;
+    S[t] = e.target.checked; render();
+  });
+  document.addEventListener('dragstart', function (e) {
+    var c = e.target.closest && e.target.closest('.card'); if (!c) return;
+    S.drag = c.getAttribute('data-id'); e.dataTransfer.setData('text/plain', S.drag); e.dataTransfer.effectAllowed = 'move';
+    c.classList.add('drag');
+  });
+  document.addEventListener('dragend', function () { S.drag = null; S.over = null; [].forEach.call(document.querySelectorAll('.hot,.drag'), function (el) { el.classList.remove('hot', 'drag'); }); });
+  document.addEventListener('dragover', function (e) {
+    var z = e.target.closest && e.target.closest('.col'); if (!z || !S.drag) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    if (S.over !== z.getAttribute('data-zone')) {
+      [].forEach.call(document.querySelectorAll('.col.hot'), function (el) { el.classList.remove('hot'); });
+      S.over = z.getAttribute('data-zone'); z.classList.add('hot');
+    }
+  });
+  document.addEventListener('drop', function (e) {
+    var z = e.target.closest && e.target.closest('.col'); if (!z) return;
+    e.preventDefault();
+    var id = e.dataTransfer.getData('text/plain') || S.drag, x = S.byId[id], k = z.getAttribute('data-k'), kind = z.getAttribute('data-kind');
+    S.drag = null; S.over = null;
+    if (!x || !canTake(x, k)) return render();
+    if (kind === 't') toToday(id, k); else if (kind === 'w') toTomorrow(id, k); else if (x.t === k || x.w === k) toBacklog(id); else render();
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: day-planner
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: ASANA_PAT
+        sync: false
+      - key: ACCESS_KEY
+        sync: false
+      - key: CAL_ICS_DIMITRIS
+        sync: false
+      - key: CAL_ICS_DIMITRIS_PERSONAL
+        sync: false
+      - key: CAL_ICS_ANTONIA
+        sync: false
+      - key: CAL_ICS_DIMITRA
+        sync: false

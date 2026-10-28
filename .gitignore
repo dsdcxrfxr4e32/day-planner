@@ -1,0 +1,7 @@
+node_modules/
+data/
+shots/
+*.log
+.env
+.env.*
+test/board.json
