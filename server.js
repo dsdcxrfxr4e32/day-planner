@@ -213,7 +213,7 @@ async function loadCal(p, force) {
 }
 // { k: { today, tomorrow } | { nc: true } | { err } } for every person with a calendar slot. All the person's feeds are combined.
 async function getMeetings(today, force) {
-  const tomorrow = L.addDays(today, 1), out = {};
+  const tomorrow = L.nextWorkday(today), out = {};
   await Promise.all(CFG.PEOPLE.filter((p) => p.gid).map(async (p) => {
     const c = await loadCal(p, force);
     if (!c) { out[p.k] = { nc: true }; return; }
@@ -271,7 +271,7 @@ async function getBoard(force) {
     seen.add(t.gid);
     tasks.push({ i: t.gid, a, n: t.name || '', p: projects.join(', '), pg: t.projects && t.projects[0] ? t.projects[0].gid : '', par: t.parent ? t.parent.name : '', d, m: m === null ? L.DEFAULT_MIN : m, e: m === null ? 0 : 1, c, t: pl.t, w: pl.w, ...(pl.src ? { src: pl.src } : {}) });
   }));
-  return { today, tomorrow: L.addDays(today, 1), meet, cap: CFG.CAP_MIN, store: CFG.TODAY_STORE, workspace: CFG.WORKSPACE, people: CFG.PEOPLE.map(({ k, name }) => ({ k, name })), projects: sectionProjects(), loadedAt: new Date().toISOString(), tasks };
+  return { today, tomorrow: L.nextWorkday(today), meet, cap: CFG.CAP_MIN, store: CFG.TODAY_STORE, workspace: CFG.WORKSPACE, people: CFG.PEOPLE.map(({ k, name }) => ({ k, name })), projects: sectionProjects(), loadedAt: new Date().toISOString(), tasks };
 }
 
 const gidOk = (g) => /^\d{5,25}$/.test(String(g || ''));
@@ -336,7 +336,7 @@ async function setToday({ i, t, prev }) {
 
 // Move a task between Backlog / Today / Tomorrow. from/to: {s:'t'|'w', k} or null (Backlog).
 // Due date that goes with a slot (Europe/Athens): Today -> today, Tomorrow -> tomorrow.
-function slotDate(s) { const today = L.athensDate(new Date()); return s === 't' ? today : L.addDays(today, 1); }
+function slotDate(s) { const today = L.athensDate(new Date()); return s === 't' ? today : L.nextWorkday(today); }
 // A move also sets the due date in the same call: into Today/Tomorrow = that day (date only, replaces any
 // due time); back to Backlog = no due date. Re-dropping in the same slot changes nothing.
 async function movePlan({ i, from, to }) {

@@ -64,6 +64,13 @@ function addDays(ymd, n) {
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 }
 
+// Next working day: Friday (and the weekend) -> Monday.
+function nextWorkday(ymd) {
+  let d = addDays(ymd, 1);
+  while ([0, 6].includes(new Date(d + 'T12:00:00Z').getUTCDay())) d = addDays(d, 1);
+  return d;
+}
+
 // App save: the first line must be a D-code (same DCODE_RE as the parser); otherwise
 // prepend D10M as its own line and keep the existing notes below. Existing codes are never changed.
 function ensureDCode(notes) {
@@ -123,10 +130,10 @@ function buildNewTask(input) {
 function placeByDate({ t, w, lane, due, today }) {
   if (t || w) return { t: t || '', w: t ? '' : w || '', src: '' };
   if (due && due === today) return { t: lane, w: '', src: 'd' };
-  if (due && due === addDays(today, 1)) return { t: '', w: lane, src: 'd' };
+  if (due && due === nextWorkday(today)) return { t: '', w: lane, src: 'd' };
   return { t: '', w: '', src: '' };
 }
 // Due date of an Asana task as an Athens day: due_at (a time) wins, else due_on.
 function dueDay(t) { return t.due_at ? athensDate(t.due_at) : t.due_on || ''; }
 
-module.exports = { DEFAULT_MIN, DEFAULT_DCODE, MIN_MIN, clampMinutes, placeByDate, dueDay, buildNewTask, ensureDCode, buildTaskUpdate, DCODE_RE, minutesFromNotes, formatDCode, rewritePlainNotes, rewriteHtmlNotes, isPlainHtml, athensDate, addDays };
+module.exports = { DEFAULT_MIN, DEFAULT_DCODE, MIN_MIN, clampMinutes, placeByDate, dueDay, buildNewTask, ensureDCode, buildTaskUpdate, DCODE_RE, minutesFromNotes, formatDCode, rewritePlainNotes, rewriteHtmlNotes, isPlainHtml, athensDate, addDays, nextWorkday };

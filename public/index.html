@@ -260,6 +260,12 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   function hm(m) { var h = Math.floor(m / 60), r = m % 60; return h + ':' + (r < 10 ? '0' : '') + r; }
   function fmtDate(d) { if (!d) return 'No due date'; var p = d.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
   function today() { return S.board.today; }
+  // 'Tomorrow', or the weekday name when the next working day isn't tomorrow (Friday -> Monday)
+  function tomLbl() {
+    var t = S.board.today, w = S.board.tomorrow; if (!t || !w) return 'Tomorrow';
+    var a = Date.parse(t + 'T12:00:00Z'), b = Date.parse(w + 'T12:00:00Z');
+    return (b - a) / 86400000 === 1 ? 'Tomorrow' : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(b).getUTCDay()];
+  }
   function byDue(a, b) { if (a.d && b.d) return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; if (a.d) return -1; if (b.d) return 1; return 0; }
   function groupOf(x) {
     var p = (x.p.split(', ')[0] || '').trim();
@@ -423,7 +429,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     h += '<span style="flex:1"></span>';
     var tk = kind === 'b' ? k : (x.t || x.w || k);
     var bToday = '<button class="btn" data-act="today" data-id="' + x.i + '" data-k="' + tk + '">Today →</button>';
-    var bTom = '<button class="btn" data-act="tomorrow" data-id="' + x.i + '" data-k="' + tk + '">Tomorrow →</button>';
+    var bTom = '<button class="btn" data-act="tomorrow" data-id="' + x.i + '" data-k="' + tk + '">' + tomLbl() + ' →</button>';
     var bBack = '<button class="btn" data-act="back" data-id="' + x.i + '">← Backlog</button>';
     if (!done) {
       if (kind === 't') h += bTom + bBack;
@@ -482,7 +488,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
       h += '<div class="grp"><div class="grphd"><span class="lbl">' + esc(grp.g.label) + add + '</span><span class="small">' + own.length + ' · ' + hm(sum(own)) +
         (un.length ? '<span style="opacity:.8">  + ' + un.length + ' unassigned · ' + hm(sum(un)) + '</span>' : '') + '</span></div>';
       if (kind === 'a') { // All: sub-headed by the column each task is in; buttons as in that column
-        [['t', 'Today'], ['w', 'Tomorrow'], ['b', 'Backlog']].forEach(function (c) {
+        [['t', 'Today'], ['w', tomLbl()], ['b', 'Backlog']].forEach(function (c) {
           var xs = own.concat(un).filter(function (x) { return colOf(x, k) === c[0]; });
           if (!xs.length) return;
           h += '<div class="colsub"><span>' + c[1] + '</span><span>' + xs.length + ' · ' + hm(sum(xs)) + '</span></div>';
@@ -495,7 +501,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
       h += '</div>';
     });
     if (!items.length && kind === 't') h += '<div class="small empty">Drag tasks here or press Today →</div>';
-    if (!items.length && kind === 'w') h += '<div class="small empty">Drag tasks here or press Tomorrow →</div>';
+    if (!items.length && kind === 'w') h += '<div class="small empty">Drag tasks here or press ' + tomLbl() + ' →</div>';
     if (!items.length && kind === 'a') h += '<div class="small empty">No open tasks</div>';
     return h + '</div></div>';
   }
@@ -574,7 +580,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
       var day = plannedDay(p.k), tomAll = tasks().filter(function (x) { return x.w === p.k; });
       var mtT = meetFor(p.k, 'today'), mtW = meetFor(p.k, 'tomorrow');
       var cntToday = loadCard('Today', sum(day), sum(day.filter(function (x) { return x.c; })), 'cmp', mtT, 't-' + p.k);
-      var cntTom = loadCard('Tomorrow', sum(tomAll.filter(function (x) { return !x.c; })), sum(tomAll.filter(function (x) { return x.c; })), 'cmp', mtW, 'w-' + p.k);
+      var cntTom = loadCard(tomLbl(), sum(tomAll.filter(function (x) { return !x.c; })), sum(tomAll.filter(function (x) { return x.c; })), 'cmp', mtW, 'w-' + p.k);
       // spacer above Backlog: an invisible copy of a counter, so the three columns line up exactly
       var cntSpacer = loadCard('Backlog', 0, 0, 'cmp spacer', mtT, 'spacer');
       // All (mobile tab): every open task of the lane, once each, whatever column it is in
@@ -582,12 +588,12 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
       var tab = S.tab[p.k] || 't';
       var segB = function (kd, lbl, n, min) { return '<button data-act="mtab" data-k="' + p.k + '" data-kind="' + kd + '" class="' + (tab === kd ? 'on' : '') + '" aria-pressed="' + (tab === kd) + '">' + lbl + '<span class="small">' + n + ' · ' + hm(min) + '</span></button>'; };
       h += '<section><h2>' + esc(p.name) + ' · ' + openN + ' open' + (S.showDone ? ' · ' + doneN + ' completed in 14 days' : '') + '</h2>';
-      h += '<div class="seg" role="group" aria-label="' + esc(p.name) + ' columns">' + segB('a', 'All', allItems.length, sum(allItems)) + segB('b', 'Backlog', back.length, sum(back)) + segB('t', 'Today', todayItems.length, sum(day)) + segB('w', 'Tomorrow', tomItems.length, sum(tomItems.filter(function (x) { return !x.c; }))) + '</div>';
+      h += '<div class="seg" role="group" aria-label="' + esc(p.name) + ' columns">' + segB('a', 'All', allItems.length, sum(allItems)) + segB('b', 'Backlog', back.length, sum(back)) + segB('t', 'Today', todayItems.length, sum(day)) + segB('w', tomLbl(), tomItems.length, sum(tomItems.filter(function (x) { return !x.c; }))) + '</div>';
       h += '<div class="lane" data-tab="' + tab + '">';
       h += '<div class="colwrap" data-kind="a">' + column(p.k, 'a', 'All open', allItems, sum(allItems)) + '</div>';
       h += '<div class="colwrap" data-kind="b">' + cntSpacer + column(p.k, 'b', 'Backlog', back, sum(back), gray) + '</div>';
       h += '<div class="colwrap" data-kind="t">' + cntToday + column(p.k, 't', 'Today', todayItems, sum(plannedDay(p.k)), null, mtT) + '</div>';
-      h += '<div class="colwrap" data-kind="w">' + cntTom + column(p.k, 'w', 'Tomorrow', tomItems, sum(tomItems.filter(function (x) { return !x.c; })), null, mtW) + '</div>';
+      h += '<div class="colwrap" data-kind="w">' + cntTom + column(p.k, 'w', tomLbl(), tomItems, sum(tomItems.filter(function (x) { return !x.c; })), null, mtW) + '</div>';
       h += '</div></section>';
     });
 
@@ -644,7 +650,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     var E = S.ed; if (!E) { modal.innerHTML = ''; return; }
     var x = S.byId[E.id] || {}, t = E.data;
     var h = '<div class="mbg" data-mbg="1"><div class="pane" role="dialog" aria-modal="true" aria-label="Edit task">';
-    h += '<div class="phd"><span class="small">' + (E.isNew ? 'New task' + (E.ctx.kind === 't' ? ' · Today' : E.ctx.kind === 'w' ? ' · Tomorrow' : '') : t && t.completed ? '✓ Completed task' : 'Task') + '</span><button class="btn bbig" data-ed="cancel" aria-label="Close">✕</button></div><div class="pbody">';
+    h += '<div class="phd"><span class="small">' + (E.isNew ? 'New task' + (E.ctx.kind === 't' ? ' · Today' : E.ctx.kind === 'w' ? ' · ' + tomLbl() : '') : t && t.completed ? '✓ Completed task' : 'Task') + '</span><button class="btn bbig" data-ed="cancel" aria-label="Close">✕</button></div><div class="pbody">';
     if (E.err) h += '<div class="perr">' + esc(E.err) + '</div>';
     if (E.loading) h += '<div class="loading" style="padding:30px"><span class="spin"></span> Loading from Asana…</div>';
     else if (t) {
@@ -705,7 +711,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     api('POST', '/api/task', body).then(function (x) {
       E.saving = false; S.ed = null; modal.innerHTML = '';
       S.board.tasks.push(x); S.byId[x.i] = x; render();
-      if (!x.tagged) showErr('Task created, but it could not be added to ' + (c.kind === 't' ? 'Today' : 'Tomorrow') + '; it is in the Backlog.');
+      if (!x.tagged) showErr('Task created, but it could not be added to ' + (c.kind === 't' ? 'Today' : tomLbl()) + '; it is in the Backlog.');
     }).catch(function (e) { E.saving = false; E.err = 'Not created: ' + e.message; paintEditor(); });
   }
   modal.addEventListener('click', function (e) {
