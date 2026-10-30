@@ -540,9 +540,6 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     });
     h += '</div></section>';
 
-    h += '<section><h2><span class="dsk">Filters</span><button class="ftog mob" data-act="ftog" aria-expanded="' + S.fOpen + '">Filters ' + (S.fOpen ? '▴' : '▾') +
-      (S.dueOnly ? ' <span class="small">· due/overdue only</span>' : '') + '</button></h2><div class="fbody' + (S.fOpen ? ' open' : '') + '"><div class="row" style="gap:16px;align-items:center">' + toggle('dueOnly', 'Only due today or overdue', S.dueOnly) +
-      '<button class="btn bbig" data-act="clear">Clear Today' + (S.who === 'all' ? '' : ' (' + esc(nameOf(S.who)) + ')') + '</button></div></div></section>';
 
     h += '<section><h2>People</h2><div class="row" style="gap:8px">';
     [{ k: 'all', name: 'All' }].concat(people).forEach(function (p) { h += '<button class="chip' + (S.who === p.k ? ' on' : '') + '" data-act="who" data-k="' + p.k + '">' + esc(p.name) + '</button>'; });
