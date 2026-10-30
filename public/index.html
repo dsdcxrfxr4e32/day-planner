@@ -206,6 +206,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   .toast{left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));max-width:none}
   .err{left:8px;right:8px;bottom:max(64px,env(safe-area-inset-bottom));max-width:none}
 }
+.allboard .scroll{max-height:none;overflow:visible}
 </style>
 </head>
 <body>
@@ -453,6 +454,20 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   }
   // Which of a lane's columns a task sits in: 't' Today, 'w' Tomorrow, 'b' Backlog.
   function colOf(x, k) { return x.t === k ? 't' : x.w === k ? 'w' : 'b'; }
+  // All people: one merged board, every open task grouped by client (like the Asana project list).
+  function everyone() {
+    var items = tasks().filter(function (x) { return !x.c || S.showDone; }).sort(byDue);
+    var openN = items.filter(function (x) { return !x.c; }).length;
+    var h = '<section><h2>Everyone · ' + openN + ' open</h2><div class="col allboard" data-zone="allboard" data-k="all" data-kind="e">';
+    h += '<div class="colhd"><b>All tasks by client</b><span class="small">' + items.length + (items.length === 1 ? ' task' : ' tasks') + ' · ' + hm(sum(items)) + '</span></div><div class="scroll">';
+    groupTasks(items).forEach(function (grp) {
+      h += '<div class="grp"><div class="grphd"><span class="lbl">' + esc(grp.g.label) + '</span><span class="small">' + grp.xs.length + ' · ' + hm(sum(grp.xs)) + '</span></div>';
+      grp.xs.forEach(function (x) { var k = x.a || 'un'; h += card(x, x.t ? 't' : x.w ? 'w' : 'b', k); });
+      h += '</div>';
+    });
+    if (!items.length) h += '<div class="small empty">No open tasks</div>';
+    return h + '</div></div></section>';
+  }
   function column(k, kind, title, items, total, extra, mt) {
     extra = extra || [];
     var zone = k + kind;
@@ -545,7 +560,8 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     [{ k: 'all', name: 'All' }].concat(people).forEach(function (p) { h += '<button class="chip' + (S.who === p.k ? ' on' : '') + '" data-act="who" data-k="' + p.k + '">' + esc(p.name) + '</button>'; });
     h += '</div></section>';
 
-    people.filter(function (p) { return S.who === 'all' || p.k === S.who; }).forEach(function (p) {
+    if (S.who === 'all') h += everyone();
+    people.filter(function (p) { return S.who !== 'all' && p.k === S.who; }).forEach(function (p) {
       var mine = tasks().filter(function (x) { return x.a === p.k; });
       var openN = mine.filter(function (x) { return !x.c; }).length, doneN = mine.length - openN;
       var free = mine.filter(function (x) { return !x.t && !x.w; });
