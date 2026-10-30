@@ -35,7 +35,7 @@ const CFG = {
   TODAY_STORE: process.env.TODAY_STORE || 'asana_tags',
   TAG_PREFIX: 'TODAY-',
   TOMORROW_PREFIX: 'TOMORROW-',
-  TASK_FIELDS: 'name,assignee,completed,completed_at,created_at,due_on,due_at,notes,projects.name,parent.name,tags.name',
+  TASK_FIELDS: 'name,assignee,completed,completed_at,created_at,due_on,due_at,notes,projects.name,parent.name,tags.name,memberships.section.name',
   READ_ONLY: process.env.READ_ONLY === '1', // test mode: refuse any write to Asana
 };
 
@@ -254,6 +254,7 @@ async function getBoard(force) {
     if (!a) return; // assigned outside the team lanes
     const projects = (t.projects || []).map((p) => p.name);
     if (a === 'un' && !projects.length) return;
+    if ((t.memberships || []).some((m) => m.section && /^\s*notes\s*$/i.test(m.section.name || ''))) return; // skip client Notes sections
     if (projects.some((n) => CFG.PRIVATE_PROJECT_RE.test(n)) && a !== CFG.PRIVATE_OWNER) return;
     const c = t.completed ? L.athensDate(t.completed_at) : '';
     if (t.completed && c < oldest) return;
