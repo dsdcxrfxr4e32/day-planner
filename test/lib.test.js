@@ -51,7 +51,9 @@ a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'dm', due: '2026-10-28', today: 
 a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'dm', due: '2026-10-29', today: T0 }), { t: '', w: 'dm', src: 'd' });
 a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'dm', due: '2026-10-27', today: T0 }), { t: '', w: '', src: '' });
 a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'dm', due: '', today: T0 }), { t: '', w: '', src: '' });
-a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: '2026-10-29', today: T0 }), { t: 'dm', w: '', src: '' }); // TODAY tag beats tomorrow's date
+a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: '2026-10-29', today: T0 }), { t: '', w: 'dm', src: 'd' }); // later date beats TODAY tag
+a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: '2026-11-02', today: T0 }), { t: '', w: '', src: '' });
+a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: '2026-10-20', today: T0 }), { t: 'dm', w: '', src: '' });
 a.deepEqual(L.placeByDate({ t: '', w: 'dm', lane: 'dm', due: '2026-10-28', today: T0 }), { t: '', w: 'dm', src: '' });
 a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'un', due: '2026-10-28', today: T0 }), { t: 'un', w: '', src: 'd' });
 a.equal(L.dueDay({ due_on: '2026-10-28', due_at: '2026-10-28T22:30:00.000Z' }), '2026-10-29'); // 00:30 Athens next day

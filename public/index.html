@@ -346,8 +346,9 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   }
   // slot: 't' (Today), 'w' (Tomorrow) or '' (Backlog). A task sits in at most one of Today/Tomorrow.
   // Untagged tasks sit in Today/Tomorrow by due date (src 'd'); re-place them after a date change.
-  function replace(x) {
-    if (!x || (x.src !== 'd' && (x.t || x.w))) return;
+  // force: the due date was just edited, so the server dropped any Today/Tomorrow tag; place by date only.
+  function replace(x, force) {
+    if (!x || (!force && x.src !== 'd' && (x.t || x.w))) return;
     var lane = x.a;
     x.t = x.d && x.d === S.board.today ? lane : ''; x.w = x.d && x.d === S.board.tomorrow ? lane : '';
     x.src = x.t || x.w ? 'd' : '';
@@ -617,8 +618,8 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   function saveDue(id, d) {
     var x = S.byId[id]; S.dueEdit = null;
     if (!x || d === x.d) return render();
-    var old = { d: x.d, t: x.t, w: x.w, src: x.src }; x.d = d; replace(x); render();
-    api('POST', '/api/task/' + id, { due_on: d }).then(function (r) { x.d = r.d; replace(x); render(); })
+    var old = { d: x.d, t: x.t, w: x.w, src: x.src }; x.d = d; replace(x, true); render();
+    api('POST', '/api/task/' + id, { due_on: d }).then(function (r) { x.d = r.d; replace(x, true); render(); })
       .catch(function (e) { x.d = old.d; x.t = old.t; x.w = old.w; x.src = old.src; showErr('Due date not saved: ' + e.message); });
   }
 
@@ -699,7 +700,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     E.saving = true; E.err = ''; paintEditor();
     api('POST', '/api/task/' + E.id, body).then(function (r) {
       var x = S.byId[r.i];
-      if (x) { x.n = r.n; x.d = r.d; x.m = r.m; x.e = r.e; replace(x); }
+      if (x) { var dc = x.d !== r.d; x.n = r.n; x.d = r.d; x.m = r.m; x.e = r.e; replace(x, dc); }
       E.saving = false; S.ed = null; modal.innerHTML = ''; render();
     }).catch(function (e) { E.saving = false; E.err = 'Not saved: ' + e.message; paintEditor(); });
   }

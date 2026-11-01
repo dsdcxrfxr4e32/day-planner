@@ -313,10 +313,11 @@ async function getTask(i) {
 // Body: any of {name, notes, due_on}. Only fields that differ from Asana's current value are sent.
 async function updateTask(i, edits) {
   if (!gidOk(i)) throw Object.assign(new Error('bad task id'), { status: 400 });
-  const cur = (await asana('GET', '/tasks/' + i + '?opt_fields=name,notes,html_notes,due_on')).data;
+  const cur = (await asana('GET', '/tasks/' + i + '?opt_fields=name,notes,html_notes,due_on,tags.name')).data;
   const body = L.buildTaskUpdate(cur, edits);
   if (!Object.keys(body).length) return { ...(await getTask(i)), changed: [] };
   const t = (await asana('PUT', '/tasks/' + i + '?opt_fields=' + EDIT_FIELDS, { data: body })).data;
+  if ('due_on' in body) await clearPlan(i, cur.tags || []);
   return { ...taskView(t), changed: Object.keys(body) };
 }
 
@@ -333,6 +334,18 @@ async function setToday({ i, t, prev }) {
   }
   if (t) await asana('POST', '/tasks/' + i + '/addTag', { data: { tag: await todayTagGid(t, true) } });
   return { i, t: t || '' };
+}
+
+// A due-date edit drops the task's Today/Tomorrow plan, so the new date alone decides its column
+// (today -> Today, next workday -> Tomorrow, else Backlog) and the picked date is kept.
+async function clearPlan(i, tags) {
+  if (CFG.TODAY_STORE === 'file') {
+    for (const s of ['t', 'w']) { const f = SLOT[s].file; await (fileLock = fileLock.then(() => { const p = readJson(f); if (p[i]) { delete p[i]; writeJson(f, p); } })); }
+    return;
+  }
+  const pfx = [CFG.TAG_PREFIX, CFG.TOMORROW_PREFIX];
+  for (const tg of tags) if (pfx.some((x) => x && (tg.name || '').startsWith(x)) && CFG.PEOPLE.some((p) => pfx.some((x) => tg.name === x + p.name)))
+    await asana('POST', '/tasks/' + i + '/removeTag', { data: { tag: tg.gid } });
 }
 
 // Move a task between Backlog / Today / Tomorrow. from/to: {s:'t'|'w', k} or null (Backlog).

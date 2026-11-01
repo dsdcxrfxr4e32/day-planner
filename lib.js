@@ -127,7 +127,9 @@ function buildNewTask(input) {
 
 // Column placement: explicit TODAY-/TOMORROW- tags win; otherwise the due date (Athens) decides:
 // due today -> Today, due tomorrow -> Tomorrow, anything else (incl. overdue) -> Backlog. lane = the assignee key.
+// A due date later than today never sits in Today, whatever the tags say: it goes by date instead.
 function placeByDate({ t, w, lane, due, today }) {
+  if (t && due && due > today) { t = ''; w = ''; }
   if (t || w) return { t: t || '', w: t ? '' : w || '', src: '' };
   if (due && due === today) return { t: lane, w: '', src: 'd' };
   if (due && due === nextWorkday(today)) return { t: '', w: lane, src: 'd' };
