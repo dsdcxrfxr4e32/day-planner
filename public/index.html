@@ -337,7 +337,8 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   }
   function bump(id, delta) {
     var x = S.byId[id]; if (!x) return;
-    x.m = Math.max(10, Math.min(480, x.m + delta)); // never below 10 min x.e = 1; render();
+    x.m = Math.max(10, Math.min(480, x.m + delta)); // never below 10 min
+    x.e = 1; render();
     clearTimeout(S.minTimers[id]);
     S.minTimers[id] = setTimeout(function () {
       var want = x.m;
