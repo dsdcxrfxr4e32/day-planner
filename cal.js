@@ -49,8 +49,13 @@ function declinedBy(ev, selfEmails) {
   return asList(ev.attendee).some((a) => selfEmails.includes(emailOf(a)) && String(params(a).PARTSTAT || '').toUpperCase() === 'DECLINED');
 }
 
-function tentativeBy(ev, selfEmails) {
-  return asList(ev.attendee).some((a) => selfEmails.includes(emailOf(a)) && String(params(a).PARTSTAT || '').toUpperCase() === 'TENTATIVE');
+// Invite not yet accepted by this person: TENTATIVE or NEEDS-ACTION (unanswered).
+function notAcceptedBy(ev, selfEmails) {
+  return asList(ev.attendee).some((a) => {
+    if (!selfEmails.includes(emailOf(a))) return false;
+    const ps = String(params(a).PARTSTAT || '').toUpperCase();
+    return ps === 'TENTATIVE' || ps === 'NEEDS-ACTION';
+  });
 }
 
 function parse(text) { return ical.sync.parseICS(String(text)); }
@@ -81,9 +86,28 @@ function instances(cal, from, to) {
       out.push({ start: s, end: e, full, ev, uid: ev.uid, inst: ev.recurrenceid ? +ev.recurrenceid : null });
     }
   }
-  for (const x of out) if (x.full && !(x.end > x.start)) x.end = x.start + 24 * 3600e3; // all-day without DTEND = one day
+  // VALUE=DATE is host-local midnight (node-ical). Re-pin those calendar dates to
+  // Europe/Athens so an all-day event stays on its feed date when the process TZ
+  // is UTC (this machine, Render). DTEND stays exclusive: it does not spill into the next Athens day.
+  for (const x of out) {
+    if (!x.full) continue;
+    const startYmd = localYmd(x.start);
+    const endYmd = x.end > x.start ? localYmd(x.end) : addCalendarDays(startYmd, 1);
+    x.start = athensMidnight(startYmd);
+    x.end = athensMidnight(endYmd);
+  }
   // zero-length events (e.g. a reminder at 09:30) count as overlapping when they start inside the window
   return out.filter((x) => x.start < to && (x.end > from || (x.end === x.start && x.start >= from)));
+}
+
+// Calendar Y-M-D of a host-local instant (VALUE=DATE), not the UTC date.
+function localYmd(ms) {
+  const d = new Date(ms);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function addCalendarDays(ymd, n) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 }
 
 const utcStamp = (t) => new Date(t).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); // 20261029T080000Z
@@ -116,8 +140,9 @@ function mergedMinutes(intervals) {
 // Client meetings for one Athens calendar day: { min, n, nt, list:[{s, e, title, link, tent?}] } (times clipped to the day).
 // All of a person's calendar events for one Athens day (not only client meetings):
 // { min, n, nt, list:[{s, e, title, link, tent?}], allday:[{title, link}] }
-// Counted: accepted / needs-action / own events, overlaps merged. Tentative: listed, not counted.
-// Declined and cancelled: hidden. Zero-length events are listed (s === e) and add 0. All-day: chips, never counted.
+// Counted & shown: accepted / own events (overlaps merged).
+// Hidden (not listed, not counted): declined, cancelled, tentative, and unanswered (NEEDS-ACTION).
+// Zero-length events are listed (s === e) and add 0. All-day: chips, never counted.
 function dayMeetings(cal, ymd, selfEmails, calEmail) {
   const [from, to] = dayWindow(ymd);
   const self = (selfEmails || []).map((e) => String(e).toLowerCase());
@@ -126,24 +151,24 @@ function dayMeetings(cal, ymd, selfEmails, calEmail) {
     const ev = x.ev;
     if (String(ev.status || '').toUpperCase() === 'CANCELLED') continue;
     if (declinedBy(ev, self)) continue;
+    if (notAcceptedBy(ev, self)) continue; // tentative or unanswered invite
     const title = String(val(ev.summary) || '(no title)'), link = eventLink(x.uid, x.inst, calEmail, ymd, x.full);
     if (x.full) { allday.push({ title, link }); continue; }
     if (x.end < x.start) continue;
-    list.push({ s: new Date(Math.max(x.start, from)).toISOString(), e: new Date(Math.max(Math.min(x.end, to), Math.max(x.start, from))).toISOString(), title, link, ...(tentativeBy(ev, self) ? { tent: true } : {}) });
+    list.push({ s: new Date(Math.max(x.start, from)).toISOString(), e: new Date(Math.max(Math.min(x.end, to), Math.max(x.start, from))).toISOString(), title, link });
   }
   list.sort((a, b) => (a.s < b.s ? -1 : a.s > b.s ? 1 : a.e < b.e ? -1 : a.e > b.e ? 1 : 0));
   allday.sort((a, b) => (a.title < b.title ? -1 : 1));
-  // Tentative events are listed but not counted (minutes, count, overlap merge).
-  const counted = list.filter((m) => !m.tent);
-  return { min: mergedMinutes(counted.map((m) => [Date.parse(m.s), Date.parse(m.e)])), n: counted.length, nt: list.length - counted.length, list, allday };
+  return { min: mergedMinutes(list.map((m) => [Date.parse(m.s), Date.parse(m.e)])), n: list.length, nt: 0, list, allday };
 }
 
 // Merge several feeds' days (e.g. primary + Personal calendar) into one; overlaps across feeds merged too.
 function combineDays(days) {
-  const list = [].concat(...days.map((d) => d.list)), allday = [].concat(...days.map((d) => d.allday || []));
+  // Drop any leftover tent/unaccepted markers; dayMeetings already hides them.
+  const list = [].concat(...days.map((d) => d.list)).filter((m) => !m.tent);
+  const allday = [].concat(...days.map((d) => d.allday || []));
   list.sort((a, b) => (a.s < b.s ? -1 : a.s > b.s ? 1 : a.e < b.e ? -1 : a.e > b.e ? 1 : 0));
-  const counted = list.filter((m) => !m.tent);
-  return { min: mergedMinutes(counted.map((m) => [Date.parse(m.s), Date.parse(m.e)])), n: counted.length, nt: list.length - counted.length, list, allday };
+  return { min: mergedMinutes(list.map((m) => [Date.parse(m.s), Date.parse(m.e)])), n: list.length, nt: 0, list, allday };
 }
 
 module.exports = { combineDays, eventLink, parse, calName, dayMeetings, dayWindow, athensMidnight, isClientMeeting, isExternalAttendee, mergedMinutes, CLIENT_CODE_RE };
