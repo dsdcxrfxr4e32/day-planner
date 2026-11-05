@@ -10,19 +10,19 @@ a.equal(C.calName(cal), 'test@precisegreece.gr');
 // 10-11 + 10:30-11:30 merged 90; internal 12-13 60; weekly 16:30-17 + '2026 planning' 17-18 merged 90 -> 240.
 // Hidden: cancelled, declined (case-insensitive email). All-day -> allday chips, not counted.
 const d1 = C.dayMeetings(cal, '2026-11-02', SELF);
+// Hidden: tentative (PARTSTAT=TENTATIVE) and unanswered (NEEDS-ACTION) — not listed, not counted.
 a.deepEqual(titles(d1), ['09:30-09:30 Reminder call', '10:00-11:00 Client call (external attendee)', '10:30-11:30 054a Site visit', '12:00-13:00 PRECISE internal sync',
-  '16:30-17:00 917 Weekly', '16:45-17:30 054 Tentative workshop', '17:00-18:00 2026 planning']);
-// tentative (self PARTSTAT=TENTATIVE) is listed but not counted and not merged (it would bridge nothing extra here, but would add 16:45-17:30 overlap)
-a.equal(d1.n, 6); a.equal(d1.nt, 1); a.equal(d1.min, 240);
-a.deepEqual(d1.list.map((m) => !!m.tent), [false, false, false, false, false, true, false]);
+  '16:30-17:00 917 Weekly', '17:00-18:00 2026 planning']);
+a.equal(d1.n, 6); a.equal(d1.nt, 0); a.equal(d1.min, 240);
+a.ok(d1.list.every((m) => !m.tent));
 a.equal(d1.list[0].s, d1.list[0].e); // zero-length
 a.deepEqual(d1.allday.map((x) => x.title), ['917 Workshop day']);
 a.deepEqual(Object.keys(d1.list[0]).sort(), ['e', 'link', 's', 'title']); // nothing else exposed
 a.deepEqual(Object.keys(d1.allday[0]).sort(), ['link', 'title']);
 a.deepEqual(C.dayMeetings(cal, '2026-11-03', SELF).allday, []); // DTEND is exclusive
-{ // tentative alone, not overlapping anything counted: still 0 minutes
+{ // moving the tentative elsewhere still does not list it
   const t = C.parse(fs.readFileSync(path.join(__dirname, 'fixture.ics'), 'utf8').replace('20261102T164500', '20261102T190000').replace('20261102T173000', '20261102T200000'));
-  const d = C.dayMeetings(t, '2026-11-02', SELF); a.equal(d.min, 240); a.equal(d.nt, 1);
+  const d = C.dayMeetings(t, '2026-11-02', SELF); a.equal(d.min, 240); a.equal(d.nt, 0); a.ok(!d.list.some((m) => /Tentative/.test(m.title) || /Unanswered/.test(m.title)));
 }
 // Tue 3 Nov: late call clipped at midnight Athens -> 30 min.
 const d2 = C.dayMeetings(cal, '2026-11-03', SELF);
@@ -35,8 +35,8 @@ a.deepEqual(titles(C.dayMeetings(cal, '2026-11-17', SELF)), ['09:00-09:45 917 We
 a.deepEqual(titles(C.dayMeetings(cal, '2026-11-23', SELF)), ['16:30-17:00 917 Weekly']);
 // Before DST end (26 Oct is EET already; 19 Oct is EEST): weekly at 16:30 local both times.
 a.deepEqual(titles(C.dayMeetings(cal, '2026-10-19', SELF)), ['16:30-17:00 917 Weekly']);
-// Without the self email the declined lunch counts.
-a.equal(C.dayMeetings(cal, '2026-11-02', []).n, 8); a.equal(C.dayMeetings(cal, '2026-11-02', []).nt, 0); a.equal(C.dayMeetings(cal, '2026-11-02', []).min, 300); // + declined lunch 60, tentative counted (inside 16:30-18)
+// Without the self email declined / tentative / unanswered all show (no PARTSTAT match).
+a.equal(C.dayMeetings(cal, '2026-11-02', []).n, 9); a.equal(C.dayMeetings(cal, '2026-11-02', []).nt, 0); a.equal(C.dayMeetings(cal, '2026-11-02', []).min, 330); // + declined lunch 60 + unanswered 30 (tentative inside 16:30-18)
 // helpers
 a.ok(C.CLIENT_CODE_RE.test('054 x')); a.ok(C.CLIENT_CODE_RE.test('917a Review')); a.ok(C.CLIENT_CODE_RE.test(' 917 ')); a.ok(!C.CLIENT_CODE_RE.test('2026 plan')); a.ok(!C.CLIENT_CODE_RE.test('ADA 054'));
 a.equal(C.mergedMinutes([[0, 60e3 * 60], [30 * 60e3, 90 * 60e3], [120 * 60e3, 150 * 60e3]]), 120);
@@ -67,6 +67,6 @@ console.log('calendar tests: all passed');
   const x = { min: 60, n: 1, nt: 0, list: [{ s: '2026-11-02T08:00:00.000Z', e: '2026-11-02T09:00:00.000Z', title: 'A', link: 'l' }], allday: [{ title: 'Off', link: 'l' }] };
   const y = { min: 60, n: 1, nt: 1, list: [{ s: '2026-11-02T08:30:00.000Z', e: '2026-11-02T09:30:00.000Z', title: 'B', link: 'l' }, { s: '2026-11-02T12:00:00.000Z', e: '2026-11-02T13:00:00.000Z', title: 'T', link: 'l', tent: true }], allday: [] };
   const z = C.combineDays([x, y]);
-  a.equal(z.min, 90); a.equal(z.n, 2); a.equal(z.nt, 1); a.deepEqual(z.list.map((m) => m.title), ['A', 'B', 'T']); a.deepEqual(z.allday.map((m) => m.title), ['Off']);
+  a.equal(z.min, 90); a.equal(z.n, 2); a.equal(z.nt, 0); a.deepEqual(z.list.map((m) => m.title), ['A', 'B']); a.deepEqual(z.allday.map((m) => m.title), ['Off']);
   console.log('calendar combine tests: all passed');
 }
