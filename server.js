@@ -35,7 +35,7 @@ const CFG = {
   TODAY_STORE: process.env.TODAY_STORE || 'asana_tags',
   TAG_PREFIX: 'TODAY-',
   TOMORROW_PREFIX: 'TOMORROW-',
-  TASK_FIELDS: 'name,assignee,completed,completed_at,created_at,due_on,due_at,notes,projects.name,parent.name,tags.name,memberships.section.name',
+  TASK_FIELDS: 'name,assignee,completed,completed_at,created_at,due_on,due_at,notes,projects.name,projects.archived,parent.name,tags.name,memberships.section.name',
   READ_ONLY: process.env.READ_ONLY === '1', // test mode: refuse any write to Asana
 };
 
@@ -115,7 +115,8 @@ async function listAll(p) {
 let projectCache = null;
 async function excludedProjectGids() {
   if (!projectCache || Date.now() - projectCache.at > 3600e3) {
-    const ps = await listAll('/workspaces/' + CFG.WORKSPACE + '/projects?opt_fields=name');
+    // archived=false: only active projects (for + new-task picker and unassigned excludes)
+    const ps = await listAll('/workspaces/' + CFG.WORKSPACE + '/projects?archived=false&opt_fields=name,archived');
     projectCache = { at: Date.now(), all: ps, gids: ps.filter((p) => CFG.EXCLUDE_UNASSIGNED_PROJECTS.includes(p.name)).map((p) => p.gid) };
   }
   return projectCache.gids;
@@ -252,7 +253,11 @@ async function getBoard(force) {
     if (seen.has(t.gid)) return;
     const a = t.assignee ? keyByGid[t.assignee.gid] : 'un';
     if (!a) return; // assigned outside the team lanes
-    const projects = (t.projects || []).map((p) => p.name);
+    const projObjs = t.projects || [];
+    const activeProjs = projObjs.filter((p) => !p.archived);
+    // Hide tasks that only live in archived Asana projects
+    if (projObjs.length && !activeProjs.length) return;
+    const projects = activeProjs.map((p) => p.name);
     if (a === 'un' && !projects.length) return;
     if ((t.memberships || []).some((m) => m.section && /notes/i.test(m.section.name || ''))) return; // skip any section whose name contains notes
     if (projects.some((n) => CFG.PRIVATE_PROJECT_RE.test(n)) && a !== CFG.PRIVATE_OWNER) return;
@@ -270,7 +275,7 @@ async function getBoard(force) {
     if (owner) tom = ''; // at most one of Today/Tomorrow; Today wins
     const d = L.dueDay(t), pl = L.placeByDate({ t: owner, w: tom, lane: a, due: d, today });
     seen.add(t.gid);
-    tasks.push({ i: t.gid, a, n: t.name || '', p: projects.join(', '), pg: t.projects && t.projects[0] ? t.projects[0].gid : '', par: t.parent ? t.parent.name : '', d, m: m === null ? L.DEFAULT_MIN : m, e: m === null ? 0 : 1, c, t: pl.t, w: pl.w, ...(pl.src ? { src: pl.src } : {}) });
+    tasks.push({ i: t.gid, a, n: t.name || '', p: projects.join(', '), pg: activeProjs[0] ? activeProjs[0].gid : '', par: t.parent ? t.parent.name : '', d, m: m === null ? L.DEFAULT_MIN : m, e: m === null ? 0 : 1, c, t: pl.t, w: pl.w, ...(pl.src ? { src: pl.src } : {}) });
   }));
   return { today, tomorrow: L.nextWorkday(today), meet, cap: CFG.CAP_MIN, store: CFG.TODAY_STORE, workspace: CFG.WORKSPACE, people: CFG.PEOPLE.map(({ k, name }) => ({ k, name })), projects: sectionProjects(), loadedAt: new Date().toISOString(), tasks };
 }
