@@ -254,7 +254,7 @@ async function getBoard(force) {
     if (!a) return; // assigned outside the team lanes
     const projects = (t.projects || []).map((p) => p.name);
     if (a === 'un' && !projects.length) return;
-    if ((t.memberships || []).some((m) => m.section && /notes/i.test(m.section.name || ''))) return; // skip any section whose name contains notes
+    if ((t.memberships || []).some((m) => m.section && /^\s*notes\b/i.test(m.section.name || ''))) return; // skip Notes* sections (Notes, NOTES: …, NOTES (…))
     if (projects.some((n) => CFG.PRIVATE_PROJECT_RE.test(n)) && a !== CFG.PRIVATE_OWNER) return;
     const c = t.completed ? L.athensDate(t.completed_at) : '';
     if (t.completed && c < oldest) return;
