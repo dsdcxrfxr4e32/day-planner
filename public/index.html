@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>if('scrollRestoration'in history)history.scrollRestoration='manual';</script>
 <meta name="theme-color" content="#ffffff">
 <meta name="robots" content="noindex">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12,7 +13,8 @@
 :root{--bg:#fff;--subtle:#f6f7f9;--elev:#fff;--bd:#e2e5e9;--bds:#eceef1;--focus:#3b6cf6;--t1:#111418;--t2:#4a5059;--t3:#8a9099;--ok:#1f9d55;--bad:#d93025;--warn:#b26a00;--acc:#eaf0ff;--fill:#eceef1;--r:8px}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--t1);font:14px/20px system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
-.wrap{max-width:1600px;margin:0 auto;padding:20px 20px 80px}
+/* Desktop top padding sits the title row (h1 + Refresh / toggles) clearly below the browser chrome. */
+.wrap{max-width:1600px;margin:0 auto;padding:72px 20px 80px}
 h1{font-size:24px;line-height:30px;margin:0}
 .summary{color:var(--t2);margin:4px 0 0}
 .top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-start}
@@ -221,6 +223,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     '832': '3H', '902': '1Z', '904': 'ETSI', '906': 'STONES & WALLS', '907': 'CREATIVE ARCHITECTS', '909': 'POTIROPOULOS',
     '914': 'DE-MI', '915': 'BBA', '916': 'SERIAL', '917': 'BONARCHI', '919': 'ARCHETOPO', '920': 'AYP' };
 
+  var openedAtTop = false;
   var S = { board: null, byId: {}, who: 'all', dueOnly: false, showDone: false,
     showCal: (function () { try { return localStorage.getItem('dp-showCal') !== '0'; } catch (e) { return true; } })(),
     undo: [], undoTimer: null,
@@ -609,6 +612,12 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     if (S.err) h += '<div class="err">' + esc(S.err) + '</div>';
     app.innerHTML = h;
     [].forEach.call(document.querySelectorAll('.scroll'), function (e, i) { if (scrolls[i]) e.scrollTop = scrolls[i]; });
+    // Open on the title row. The controls share the h1's top edge, so a restored offset hides them with it.
+    if (!openedAtTop) {
+      openedAtTop = true;
+      window.scrollTo(0, 0);
+      requestAnimationFrame(function () { window.scrollTo(0, 0); });
+    }
     if (S.dueEdit && S.dueFocus) {
       S.dueFocus = false;
       var di = document.querySelector('[data-due-input="' + S.dueEdit + '"]');
