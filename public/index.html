@@ -221,7 +221,9 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     '832': '3H', '902': '1Z', '904': 'ETSI', '906': 'STONES & WALLS', '907': 'CREATIVE ARCHITECTS', '909': 'POTIROPOULOS',
     '914': 'DE-MI', '915': 'BBA', '916': 'SERIAL', '917': 'BONARCHI', '919': 'ARCHETOPO', '920': 'AYP' };
 
-  var S = { board: null, byId: {}, who: 'all', dueOnly: false, showDone: false, undo: [], undoTimer: null,
+  var S = { board: null, byId: {}, who: 'all', dueOnly: false, showDone: false,
+    showCal: (function () { try { return localStorage.getItem('dp-showCal') !== '0'; } catch (e) { return true; } })(),
+    undo: [], undoTimer: null,
     drag: null, over: null, busy: 0, err: '', errTimer: null, minTimers: {}, loading: false, dueEdit: null, ed: null, tab: {}, fOpen: false };
 
   /* ---------- server ---------- */
@@ -441,6 +443,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   }
   // Calendar events shown as blocks at the top of a Today/Tomorrow column (title, times, link only).
   function meetingBlocks(mt) {
+    if (!S.showCal) return '';
     if (!mt || !mt.list || !(mt.list.length || (mt.allday || []).length)) return '';
     var h = '<div class="mgrp"><div class="grphd"><span class="small" style="font-weight:600;color:var(--t2)"><span class="msw"></span> Calendar · ' + mt.n + ' · ' + hm(mt.min) +
       (mt.nt ? '<span style="font-weight:400"> + ' + mt.nt + ' tentative</span>' : '') + '</span></div>';
@@ -515,7 +518,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   }
   function tAth(iso) { return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Athens' }); }
   function meetLine(mt, key) {
-    if (!mt) return '';
+    if (!S.showCal || !mt) return '';
     if (mt.nc) return '<div class="small" style="opacity:.75">calendar not connected</div>';
     if (mt.err) return '<div class="small" style="opacity:.75">calendar unavailable</div>';
     var span = function (x) { return x.s === x.e ? tAth(x.s) : tAth(x.s) + '–' + tAth(x.e); };
@@ -532,7 +535,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     return h;
   }
   function loadCard(label, taskMin, doneMin, extraCls, mt, key) {
-    var cap = S.board.cap, meetMin = mt && mt.min ? mt.min : 0, m = taskMin + meetMin, overCap = m > cap, pct = Math.min(100, m / cap * 100);
+    var cap = S.board.cap, meetMin = (S.showCal && mt && mt.min) ? mt.min : 0, m = taskMin + meetMin, overCap = m > cap, pct = Math.min(100, m / cap * 100);
     var mPct = Math.min(100, meetMin / cap * 100), tPct = Math.max(0, pct - mPct);
     var h = '<div class="load' + (extraCls ? ' ' + extraCls : '') + '"><div class="hd"><span style="color:var(--t2)">' + esc(label) + '</span><span class="small' + (overCap ? ' over' : '') + '">' + (overCap ? 'Over by ' + hm(m - cap) : hm(Math.max(0, cap - m)) + ' free') + '</span></div>';
     h += '<div class="metric' + (overCap ? ' over' : '') + '">' + hm(m) + ' <span style="font-size:14px;color:var(--t3);font-weight:400">/ 8:00</span></div>';
@@ -553,7 +556,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     var scrolls = [].map.call(document.querySelectorAll('.scroll'), function (e) { return e.scrollTop; });
     var people = S.board.people, cap = S.board.cap, T = today();
     var h = '<div class="top"><div><h1>Team day planner</h1><p class="summary">Every open Asana task per person, with minutes. Changes write straight to Asana.</p></div>';
-    h += '<div class="topr"><span class="status" id="status">' + statusHtml() + '</span><button class="btn bbig" data-act="refresh">↻ Refresh</button>' + toggle('showDone', 'Show completed', S.showDone) + '</div></div>';
+    h += '<div class="topr"><span class="status" id="status">' + statusHtml() + '</span><button class="btn bbig" data-act="refresh">↻ Refresh</button>' + toggle('showCal', 'Show calendar', S.showCal) + toggle('showDone', 'Show completed', S.showDone) + '</div></div>';
 
     h += '<section><h2>Today\'s load</h2><p class="cap">Planned minutes against an 8-hour (480 min) day</p><div class="row">';
     people.forEach(function (p) {
@@ -770,7 +773,9 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     var di = e.target.getAttribute && e.target.getAttribute('data-due-input');
     if (di) { var v = e.target.value; if (!v || /^(19|20)\d\d-\d\d-\d\d$/.test(v)) saveDue(di, v); return; }
     var t = e.target.getAttribute && e.target.getAttribute('data-tog'); if (!t) return;
-    S[t] = e.target.checked; render();
+    S[t] = e.target.checked;
+    if (t === 'showCal') { try { localStorage.setItem('dp-showCal', S.showCal ? '1' : '0'); } catch (err) {} }
+    render();
   });
   document.addEventListener('dragstart', function (e) {
     var c = e.target.closest && e.target.closest('.card'); if (!c) return;
