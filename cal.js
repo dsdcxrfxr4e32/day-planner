@@ -137,6 +137,20 @@ function mergedMinutes(intervals) {
   return Math.round(total / 60000);
 }
 
+// Minutes still left at `now` (ms since epoch). An ended interval adds nothing, one in
+// progress keeps only [now, end], a later one counts in full. Overlaps merge as in mergedMinutes.
+// Zero-length events add 0. All-day and unaccepted events are not in these intervals.
+function remainingMinutes(intervals, now) {
+  now = +now;
+  const left = [];
+  for (const [s, e] of intervals || []) {
+    if (!(e > now)) continue;
+    const a = Math.max(s, now);
+    if (e > a) left.push([a, e]);
+  }
+  return mergedMinutes(left);
+}
+
 // Client meetings for one Athens calendar day: { min, n, nt, list:[{s, e, title, link, tent?}] } (times clipped to the day).
 // All of a person's calendar events for one Athens day (not only client meetings):
 // { min, n, nt, list:[{s, e, title, link, tent?}], allday:[{title, link}] }
@@ -171,4 +185,4 @@ function combineDays(days) {
   return { min: mergedMinutes(list.map((m) => [Date.parse(m.s), Date.parse(m.e)])), n: list.length, nt: 0, list, allday };
 }
 
-module.exports = { combineDays, eventLink, parse, calName, dayMeetings, dayWindow, athensMidnight, isClientMeeting, isExternalAttendee, mergedMinutes, CLIENT_CODE_RE };
+module.exports = { combineDays, eventLink, parse, calName, dayMeetings, dayWindow, athensMidnight, isClientMeeting, isExternalAttendee, mergedMinutes, remainingMinutes, CLIENT_CODE_RE };

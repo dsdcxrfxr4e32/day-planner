@@ -320,9 +320,35 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   }
   function canTake(x, k) { return x.a === k || (x.a === 'un' && k !== 'un' && !x.c); }
   function dueOk(x) { return !S.dueOnly || (x.d !== '' && x.d <= today()); }
-  // planned tasks counted in a lane's day: open, or completed today
-  function plannedDay(k) { return tasks().filter(function (x) { return x.t === k && (!x.c || x.c === today()); }); }
+  // Today column: open tasks, plus ones completed today (the "done" line only).
+  function todayTasks(k) { return tasks().filter(function (x) { return x.t === k && (!x.c || x.c === today()); }); }
+  function openOf(xs) { return xs.filter(function (x) { return !x.c; }); }
   function sum(xs) { return xs.reduce(function (s, x) { return s + x.m; }, 0); }
+  // Minutes of meetings still left. Same rule as cal.remainingMinutes: ended adds 0, in progress
+  // keeps only what is left, later meetings count in full, overlaps merge. All-day and
+  // unaccepted events are not in the list.
+  function remainingMeet(list, now) {
+    var left = [];
+    (list || []).forEach(function (m) {
+      var s = Date.parse(m.s), e = Date.parse(m.e);
+      if (!(e > now)) return;
+      var a = Math.max(s, now);
+      if (e > a) left.push([a, e]);
+    });
+    left.sort(function (a, b) { return a[0] - b[0]; });
+    var total = 0, cur = null;
+    left.forEach(function (iv) {
+      if (!cur || iv[0] > cur[1]) { if (cur) total += cur[1] - cur[0]; cur = [iv[0], iv[1]]; }
+      else cur[1] = Math.max(cur[1], iv[1]);
+    });
+    if (cur) total += cur[1] - cur[0];
+    return Math.round(total / 60000);
+  }
+  // Today's meeting minutes are what is left at render time. The event list is unchanged.
+  function todayMeet(mt) {
+    if (!mt || mt.nc || mt.err || !mt.list) return mt;
+    return { min: remainingMeet(mt.list, Date.now()), n: mt.n, nt: mt.nt || 0, list: mt.list, allday: mt.allday || [], stale: mt.stale };
+  }
 
   /* ---------- actions ---------- */
   function markDone(id) {
@@ -572,14 +598,16 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     var app = document.getElementById('app');
     if (!S.board) { app.innerHTML = '<div class="loading">' + (S.err ? esc(S.err) + ' <button class="btn bbig" data-act="refresh">Try again</button>' : '<span class="spin"></span> Loading from Asana…') + '</div>'; return; }
     var scrolls = [].map.call(document.querySelectorAll('.scroll'), function (e) { return e.scrollTop; });
-    var people = S.board.people, cap = S.board.cap, T = today();
+    if (S.who === 'un') S.who = 'all';
+    // Same remaining-work totals for Dimitris, Antonia, and Dimitra. Unassigned is not a lane or a load card.
+    var people = S.board.people.filter(function (p) { return p.k !== 'un'; }), cap = S.board.cap, T = today();
     var h = '<div class="top"><div><h1>Team day planner</h1><p class="summary">Every open Asana task per person, with minutes. Changes write straight to Asana.</p></div>';
     h += '<div class="topr"><span class="status" id="status">' + statusHtml() + '</span><button class="btn bbig" data-act="refresh">↻ Refresh</button>' + toggle('showCal', 'Show calendar', S.showCal) + toggle('showDone', 'Show completed', S.showDone) + '</div></div>';
 
-    h += '<section><h2>Today\'s load</h2><p class="cap">Planned minutes against an 8-hour (480 min) day</p><div class="row">';
+    h += '<section><h2>Today\'s load</h2><p class="cap">Minutes still to do against an 8-hour (480 min) day</p><div class="row">';
     people.forEach(function (p) {
-      var day = plannedDay(p.k);
-      h += loadCard(p.name, sum(day), sum(day.filter(function (x) { return x.c; })), '', meetFor(p.k, 'today'), 'top-' + p.k);
+      var day = todayTasks(p.k);
+      h += loadCard(p.name, sum(openOf(day)), sum(day.filter(function (x) { return x.c; })), '', todayMeet(meetFor(p.k, 'today')), 'top-' + p.k);
     });
     h += '</div></section>';
 
@@ -600,11 +628,13 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
       var tomItems = tasks().filter(function (x) { return x.w === p.k && (!x.c || S.showDone); });
       var monItems = tasks().filter(function (x) { return x.mo === p.k && (!x.c || S.showDone); });
       var gray = p.k === 'un' ? [] : tasks().filter(function (x) { return x.a === 'un' && !x.c && !x.t && !x.w && !x.mo && dueOk(x); }).sort(byDue);
-      var day = plannedDay(p.k), tomAll = tasks().filter(function (x) { return x.w === p.k; }), monAll = tasks().filter(function (x) { return x.mo === p.k; });
-      var mtT = meetFor(p.k, 'today'), mtW = meetFor(p.k, 'tomorrow'), mtM = meetFor(p.k, 'monday');
-      var cntToday = loadCard('Today', sum(day), sum(day.filter(function (x) { return x.c; })), 'cmp', mtT, 't-' + p.k);
-      var cntTom = loadCard(tomLbl(), sum(tomAll.filter(function (x) { return !x.c; })), sum(tomAll.filter(function (x) { return x.c; })), 'cmp', mtW, 'w-' + p.k);
-      var cntMon = loadCard('Monday', sum(monAll.filter(function (x) { return !x.c; })), sum(monAll.filter(function (x) { return x.c; })), 'cmp', mtM, 'mo-' + p.k);
+      var day = todayTasks(p.k), tomAll = tasks().filter(function (x) { return x.w === p.k; }), monAll = tasks().filter(function (x) { return x.mo === p.k; });
+      var mtT = todayMeet(meetFor(p.k, 'today')), mtW = meetFor(p.k, 'tomorrow'), mtM = meetFor(p.k, 'monday');
+      var openMin = sum(openOf(day)), doneMin = sum(day.filter(function (x) { return x.c; }));
+      // Today: open tasks + meetings still left. Tomorrow and Monday: open tasks + that day's full meetings (they have not started).
+      var cntToday = loadCard('Today', openMin, doneMin, 'cmp', mtT, 't-' + p.k);
+      var cntTom = loadCard(tomLbl(), sum(openOf(tomAll)), sum(tomAll.filter(function (x) { return x.c; })), 'cmp', mtW, 'w-' + p.k);
+      var cntMon = loadCard('Monday', sum(openOf(monAll)), sum(monAll.filter(function (x) { return x.c; })), 'cmp', mtM, 'mo-' + p.k);
       // spacer above Backlog: an invisible copy of a counter, so the three columns line up exactly
       var cntSpacer = loadCard('Backlog', 0, 0, 'cmp spacer', mtT, 'spacer');
       // All (mobile tab): every open task of the lane, once each, whatever column it is in
@@ -612,11 +642,11 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
       var tab = S.tab[p.k] || 't';
       var segB = function (kd, lbl, n, min) { return '<button data-act="mtab" data-k="' + p.k + '" data-kind="' + kd + '" class="' + (tab === kd ? 'on' : '') + '" aria-pressed="' + (tab === kd) + '">' + lbl + '<span class="small">' + n + ' · ' + hm(min) + '</span></button>'; };
       h += '<section><h2>' + esc(p.name) + ' · ' + openN + ' open' + (S.showDone ? ' · ' + doneN + ' completed in 14 days' : '') + '</h2>';
-      h += '<div class="seg" role="group" aria-label="' + esc(p.name) + ' columns">' + segB('a', 'All', allItems.length, sum(allItems)) + segB('b', 'Backlog', back.length, sum(back)) + segB('t', 'Today', todayItems.length, sum(day)) + segB('w', tomLbl(), tomItems.length, sum(tomItems.filter(function (x) { return !x.c; }))) + segB('mo', 'Monday', monItems.length, sum(monItems.filter(function (x) { return !x.c; }))) + '</div>';
+      h += '<div class="seg" role="group" aria-label="' + esc(p.name) + ' columns">' + segB('a', 'All', allItems.length, sum(allItems)) + segB('b', 'Backlog', back.length, sum(back)) + segB('t', 'Today', todayItems.length, openMin) + segB('w', tomLbl(), tomItems.length, sum(tomItems.filter(function (x) { return !x.c; }))) + segB('mo', 'Monday', monItems.length, sum(monItems.filter(function (x) { return !x.c; }))) + '</div>';
       h += '<div class="lane" data-tab="' + tab + '">';
       h += '<div class="colwrap" data-kind="a">' + column(p.k, 'a', 'All open', allItems, sum(allItems)) + '</div>';
       h += '<div class="colwrap" data-kind="b">' + cntSpacer + column(p.k, 'b', 'Backlog', back, sum(back), gray) + '</div>';
-      h += '<div class="colwrap" data-kind="t">' + cntToday + column(p.k, 't', 'Today', todayItems, sum(plannedDay(p.k)), null, mtT) + '</div>';
+      h += '<div class="colwrap" data-kind="t">' + cntToday + column(p.k, 't', 'Today', todayItems, openMin, null, mtT) + '</div>';
       h += '<div class="colwrap" data-kind="w">' + cntTom + column(p.k, 'w', tomLbl(), tomItems, sum(tomItems.filter(function (x) { return !x.c; })), null, mtW) + '</div>';
       h += '<div class="colwrap" data-kind="mo">' + cntMon + column(p.k, 'mo', 'Monday', monItems, sum(monItems.filter(function (x) { return !x.c; })), null, mtM) + '</div>';
       h += '</div></section>';

@@ -40,6 +40,20 @@ a.equal(C.dayMeetings(cal, '2026-11-02', []).n, 9); a.equal(C.dayMeetings(cal, '
 // helpers
 a.ok(C.CLIENT_CODE_RE.test('054 x')); a.ok(C.CLIENT_CODE_RE.test('917a Review')); a.ok(C.CLIENT_CODE_RE.test(' 917 ')); a.ok(!C.CLIENT_CODE_RE.test('2026 plan')); a.ok(!C.CLIENT_CODE_RE.test('ADA 054'));
 a.equal(C.mergedMinutes([[0, 60e3 * 60], [30 * 60e3, 90 * 60e3], [120 * 60e3, 150 * 60e3]]), 120);
+// Remaining at `now`: ended drops out, in progress keeps the tail, later counts in full, overlaps stay merged.
+{
+  const iv = [[0, 60 * 60000], [30 * 60000, 90 * 60000], [120 * 60000, 180 * 60000]]; // 0-90 merged, then 120-180
+  a.equal(C.remainingMinutes(iv, -1), 150);
+  a.equal(C.remainingMinutes(iv, 45 * 60000), 105); // 45-90 (45) + 120-180 (60)
+  a.equal(C.remainingMinutes(iv, 90 * 60000), 60); // first block ended on the dot
+  a.equal(C.remainingMinutes(iv, 200 * 60000), 0);
+  a.equal(C.remainingMinutes([[5 * 60000, 5 * 60000]], 0), 0); // zero-length adds nothing
+  const nov2 = C.dayMeetings(cal, '2026-11-02', SELF).list.map((m) => [Date.parse(m.s), Date.parse(m.e)]);
+  a.equal(C.remainingMinutes(nov2, Date.parse('2026-11-02T06:00:00.000Z')), 240); // before the day: the whole plan
+  a.equal(C.remainingMinutes(nov2, Date.parse('2026-11-02T09:00:00.000Z')), 180); // 11:00 Athens: 10:30-11:30 has 30 left, then 12-13 and 16:30-18
+  a.equal(C.remainingMinutes(nov2, Date.parse('2026-11-02T15:15:00.000Z')), 45); // 17:15 Athens: 45 min of 17:00-18:00
+  a.equal(C.remainingMinutes(nov2, Date.parse('2026-11-02T16:00:00.000Z')), 0);
+}
 a.deepEqual(C.dayWindow('2026-10-25').map((x) => new Date(x).toISOString()), ['2026-10-24T21:00:00.000Z', '2026-10-25T22:00:00.000Z']);
 a.deepEqual(C.dayWindow('2026-03-29').map((x) => new Date(x).toISOString()), ['2026-03-28T22:00:00.000Z', '2026-03-29T21:00:00.000Z']);
 // Google Calendar links: eid = base64url('<id>[_<UTC start of the original occurrence>] <calendar email>')

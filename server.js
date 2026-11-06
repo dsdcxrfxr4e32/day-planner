@@ -231,7 +231,11 @@ async function getMeetings(today, force) {
     if (!ok.length) { out[p.k] = { err: errs[0] || 'calendar unavailable' }; return; }
     try {
       const day = (ymd) => CAL.combineDays(ok.map((f) => CAL.dayMeetings(f.cal, ymd, c.emails, f.calId || c.emails[0])));
-      out[p.k] = { today: day(today), tomorrow: day(tomorrow), monday: day(monday), ...(errs.length ? { stale: errs[0] } : {}) };
+      const todayMeet = day(today);
+      // Today's total is what is left now, not the original block. The list still has every event.
+      const now = Date.now();
+      todayMeet.min = CAL.remainingMinutes((todayMeet.list || []).map((m) => [Date.parse(m.s), Date.parse(m.e)]), now);
+      out[p.k] = { today: todayMeet, tomorrow: day(tomorrow), monday: day(monday), ...(errs.length ? { stale: errs[0] } : {}) };
     } catch (e) { out[p.k] = { err: 'calendar parse failed' }; console.error(new Date().toISOString(), 'calendar parse', p.name, e.message); }
   }));
   return out;
