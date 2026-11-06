@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script>if('scrollRestoration'in history)history.scrollRestoration='manual';</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#ffffff">
 <meta name="robots" content="noindex">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12,10 +15,13 @@
 <style>
 :root{--bg:#fff;--subtle:#f6f7f9;--elev:#fff;--bd:#e2e5e9;--bds:#eceef1;--focus:#3b6cf6;--t1:#111418;--t2:#4a5059;--t3:#8a9099;--ok:#1f9d55;--bad:#d93025;--warn:#b26a00;--acc:#eaf0ff;--fill:#eceef1;--r:8px}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--t1);font:14px/20px system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+/* IBM Plex Sans Regular / Medium / SemiBold. Google Fonts serves the Greek subset (and Latin) by unicode-range. */
+body{margin:0;background:var(--bg);color:var(--t1);font:400 14px/20px "IBM Plex Sans",sans-serif}
+button,input,textarea,select{font-family:inherit}
+b,strong{font-weight:600}
 /* Desktop top padding sits the title row (h1 + Refresh / toggles) clearly below the browser chrome. */
 .wrap{max-width:1600px;margin:0 auto;padding:72px 20px 80px}
-h1{font-size:24px;line-height:30px;margin:0}
+h1{font-size:24px;line-height:30px;margin:0;font-weight:600}
 .summary{color:var(--t2);margin:4px 0 0}
 .top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-start}
 .topr{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:flex-end}
@@ -79,7 +85,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
 .col{flex:1 1 280px;min-width:0;background:var(--subtle);border:1px solid var(--bds);border-radius:12px;padding:12px;min-height:120px}
 .col.hot{background:var(--acc);border:1px dashed var(--focus)}
 .colhd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;gap:8px;flex-wrap:wrap}
-.colhd b{font-size:14px}
+.colhd b{font-size:14px;font-weight:600}
 .scroll{max-height:640px;overflow-y:auto;padding-right:2px}
 .grp{margin-bottom:10px}
 .grphd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;padding:4px 2px 6px;margin-bottom:6px;border-bottom:1px solid var(--bds)}
