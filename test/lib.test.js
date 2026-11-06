@@ -37,6 +37,12 @@ a.deepEqual(L.buildTaskUpdate({ name: 'x', notes: 'plain', due_on: null }, { due
 a.deepEqual(L.buildTaskUpdate(cur, { due_on: '2026-11-02' }), { due_on: '2026-11-02' });
 a.throws(() => L.buildTaskUpdate(cur, { name: '  ' })); a.throws(() => L.buildTaskUpdate(cur, { due_on: '2/11/2026' }));
 a.equal(L.MIN_MIN, 10); a.equal(L.clampMinutes(5), 10); a.equal(L.clampMinutes(0), 10); a.equal(L.clampMinutes('x'), 10); a.equal(L.clampMinutes(20), 20); a.equal(L.clampMinutes(999, 480), 480);
+a.equal(L.DEFAULT_CAP, 480);
+a.equal(L.dayCap('ak'), 420); // Antonia: 7h
+a.equal(L.dayCap('dm'), null); // Dimitris: no day-length cap
+a.equal(L.dayCap('dd'), 480); // Dimitra: default 8h
+a.equal(L.dayCap('un'), 480);
+a.equal(L.dayCap('zz'), 480);
 console.log('editor save tests: all passed');
 // new task ('+' on a section)
 a.deepEqual(L.buildNewTask({ name: ' 054a Check drawings \n', notes: 'D10M\n' }), { name: '054a Check drawings', notes: 'D10M\n' });

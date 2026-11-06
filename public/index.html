@@ -578,13 +578,19 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     }).join('') + '</div>';
     return h;
   }
-  function loadCard(label, taskMin, doneMin, extraCls, mt, key) {
+  // null cap: remaining time only (no / h:mm, no free/over, no day bar). A number is that person's day length.
+  function personCap(p) { return p && p.cap !== undefined ? p.cap : S.board.cap; }
+  function loadCard(label, taskMin, doneMin, extraCls, mt, key, cap) {
     // Meeting minutes always count. Show calendar only hides the list (meetLine / meetingBlocks).
-    var cap = S.board.cap, meetMin = (mt && mt.min) ? mt.min : 0, m = taskMin + meetMin, overCap = m > cap, pct = Math.min(100, m / cap * 100);
-    var mPct = Math.min(100, meetMin / cap * 100), tPct = Math.max(0, pct - mPct);
-    var h = '<div class="load' + (extraCls ? ' ' + extraCls : '') + '"><div class="hd"><span style="color:var(--t2)">' + esc(label) + '</span><span class="small' + (overCap ? ' over' : '') + '">' + (overCap ? 'Over by ' + hm(m - cap) : hm(Math.max(0, cap - m)) + ' free') + '</span></div>';
-    h += '<div class="metric' + (overCap ? ' over' : '') + '">' + hm(m) + ' <span style="font-size:14px;color:var(--t3);font-weight:400">/ 8:00</span></div>';
-    h += '<div class="small">done ' + hm(doneMin) + '</div>' + meetLine(mt, key);
+    var meetMin = (mt && mt.min) ? mt.min : 0, m = taskMin + meetMin, capped = typeof cap === 'number' && cap > 0;
+    var overCap = capped && m > cap, pct = capped ? Math.min(100, m / cap * 100) : 0;
+    var mPct = capped ? Math.min(100, meetMin / cap * 100) : 0, tPct = Math.max(0, pct - mPct);
+    var h = '<div class="load' + (extraCls ? ' ' + extraCls : '') + '"><div class="hd"><span style="color:var(--t2)">' + esc(label) + '</span>';
+    if (capped) h += '<span class="small' + (overCap ? ' over' : '') + '">' + (overCap ? 'Over by ' + hm(m - cap) : hm(Math.max(0, cap - m)) + ' free') + '</span>';
+    h += '</div><div class="metric' + (overCap ? ' over' : '') + '">' + hm(m);
+    if (capped) h += ' <span style="font-size:14px;color:var(--t3);font-weight:400">/ ' + hm(cap) + '</span>';
+    h += '</div><div class="small">done ' + hm(doneMin) + '</div>' + meetLine(mt, key);
+    if (!capped) return h + '</div>';
     return h + '<div class="bar" style="margin-top:6px;display:flex">' + (mPct ? '<div class="mseg" style="width:' + mPct + '%;' + (overCap ? 'background:#f1a7a0' : '') + '"></div>' : '') +
       '<div style="width:' + tPct + '%;' + (overCap ? 'background:var(--bad)' : '') + '"></div></div></div>';
   }
@@ -601,14 +607,14 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     var scrolls = [].map.call(document.querySelectorAll('.scroll'), function (e) { return e.scrollTop; });
     if (S.who === 'un') S.who = 'all';
     // Same remaining-work totals for Dimitris, Antonia, and Dimitra. Unassigned is not a lane or a load card.
-    var people = S.board.people.filter(function (p) { return p.k !== 'un'; }), cap = S.board.cap, T = today();
+    var people = S.board.people.filter(function (p) { return p.k !== 'un'; });
     var h = '<div class="top"><div><h1>Team day planner</h1><p class="summary">Every open Asana task per person, with minutes. Changes write straight to Asana.</p></div>';
     h += '<div class="topr"><span class="status" id="status">' + statusHtml() + '</span><button class="btn bbig" data-act="refresh">↻ Refresh</button>' + toggle('showCal', 'Show calendar', S.showCal) + toggle('showDone', 'Show completed', S.showDone) + '</div></div>';
 
-    h += '<section><h2>Today\'s load</h2><p class="cap">Minutes still to do against an 8-hour (480 min) day</p><div class="row">';
+    h += '<section><h2>Today\'s load</h2><p class="cap">Minutes still to do</p><div class="row">';
     people.forEach(function (p) {
       var day = todayTasks(p.k);
-      h += loadCard(p.name, sum(openOf(day)), sum(day.filter(function (x) { return x.c; })), '', todayMeet(meetFor(p.k, 'today')), 'top-' + p.k);
+      h += loadCard(p.name, sum(openOf(day)), sum(day.filter(function (x) { return x.c; })), '', todayMeet(meetFor(p.k, 'today')), 'top-' + p.k, personCap(p));
     });
     h += '</div></section>';
 
@@ -633,11 +639,11 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
       var mtT = todayMeet(meetFor(p.k, 'today')), mtW = meetFor(p.k, 'tomorrow'), mtM = meetFor(p.k, 'monday');
       var openMin = sum(openOf(day)), doneMin = sum(day.filter(function (x) { return x.c; }));
       // Today: open tasks + meetings still left. Tomorrow and Monday: open tasks + that day's full meetings (they have not started).
-      var cntToday = loadCard('Today', openMin, doneMin, 'cmp', mtT, 't-' + p.k);
-      var cntTom = loadCard(tomLbl(), sum(openOf(tomAll)), sum(tomAll.filter(function (x) { return x.c; })), 'cmp', mtW, 'w-' + p.k);
-      var cntMon = loadCard('Monday', sum(openOf(monAll)), sum(monAll.filter(function (x) { return x.c; })), 'cmp', mtM, 'mo-' + p.k);
+      var cntToday = loadCard('Today', openMin, doneMin, 'cmp', mtT, 't-' + p.k, personCap(p));
+      var cntTom = loadCard(tomLbl(), sum(openOf(tomAll)), sum(tomAll.filter(function (x) { return x.c; })), 'cmp', mtW, 'w-' + p.k, personCap(p));
+      var cntMon = loadCard('Monday', sum(openOf(monAll)), sum(monAll.filter(function (x) { return x.c; })), 'cmp', mtM, 'mo-' + p.k, personCap(p));
       // spacer above Backlog: an invisible copy of a counter, so the three columns line up exactly
-      var cntSpacer = loadCard('Backlog', 0, 0, 'cmp spacer', mtT, 'spacer');
+      var cntSpacer = loadCard('Backlog', 0, 0, 'cmp spacer', mtT, 'spacer', personCap(p));
       // All (mobile tab): every open task of the lane, once each, whatever column it is in
       var seenA = {}, allItems = backOpen.concat(todayItems, tomItems, monItems).filter(function (x) { if (x.c || seenA[x.i]) return false; seenA[x.i] = 1; return true; });
       var tab = S.tab[p.k] || 't';

@@ -9,6 +9,15 @@ const DEFAULT_DCODE = 'D10M';
 const MIN_MIN = 10;
 function clampMinutes(m, cap) { return Math.max(MIN_MIN, Math.min(cap || 480, Math.round(Number(m) || DEFAULT_MIN))); }
 
+// Load-card day length in minutes. null means no cap: show remaining time only.
+// Antonia works 7h. Dimitris has no default day length. Everyone else is 8h.
+const DEFAULT_CAP = 480;
+function dayCap(k) {
+  if (k === 'ak') return 420;
+  if (k === 'dm') return null;
+  return DEFAULT_CAP;
+}
+
 function minutesFromNotes(notes) {
   const first = String(notes || '').split('\n')[0];
   const m = DCODE_RE.exec(first);
@@ -166,4 +175,4 @@ function placeByDate({ lane, due, today }) {
 // Due date of an Asana task as an Athens day: due_at (a time) wins, else due_on.
 function dueDay(t) { return t.due_at ? athensDate(t.due_at) : t.due_on || ''; }
 
-module.exports = { DEFAULT_MIN, DEFAULT_DCODE, MIN_MIN, clampMinutes, placeByDate, dueDay, buildNewTask, ensureDCode, buildTaskUpdate, DCODE_RE, minutesFromNotes, formatDCode, rewritePlainNotes, rewriteHtmlNotes, isPlainHtml, athensDate, addDays, nextWorkday, nextMonday, boardDates, slotDue };
+module.exports = { DEFAULT_MIN, DEFAULT_DCODE, MIN_MIN, DEFAULT_CAP, dayCap, clampMinutes, placeByDate, dueDay, buildNewTask, ensureDCode, buildTaskUpdate, DCODE_RE, minutesFromNotes, formatDCode, rewritePlainNotes, rewriteHtmlNotes, isPlainHtml, athensDate, addDays, nextWorkday, nextMonday, boardDates, slotDue };

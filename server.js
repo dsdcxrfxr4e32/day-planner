@@ -280,7 +280,7 @@ async function getBoard(force) {
     seen.add(t.gid);
     tasks.push({ i: t.gid, a, n: t.name || '', p: projects.join(', '), pg: activeProjs[0] ? activeProjs[0].gid : '', par: t.parent ? t.parent.name : '', d, m: m === null ? L.DEFAULT_MIN : m, e: m === null ? 0 : 1, c, t: pl.t, w: pl.w, mo: pl.mo, ...(pl.src ? { src: pl.src } : {}) });
   }));
-  return { today, tomorrow: dates.tomorrow, monday: dates.monday, meet, cap: CFG.CAP_MIN, store: CFG.TODAY_STORE, workspace: CFG.WORKSPACE, people: CFG.PEOPLE.map(({ k, name }) => ({ k, name })), projects: sectionProjects(), loadedAt: new Date().toISOString(), tasks };
+  return { today, tomorrow: dates.tomorrow, monday: dates.monday, meet, cap: CFG.CAP_MIN, store: CFG.TODAY_STORE, workspace: CFG.WORKSPACE, people: CFG.PEOPLE.map(({ k, name }) => ({ k, name, cap: L.dayCap(k) })), projects: sectionProjects(), loadedAt: new Date().toISOString(), tasks };
 }
 
 const gidOk = (g) => /^\d{5,25}$/.test(String(g || ''));
