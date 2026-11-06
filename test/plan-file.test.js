@@ -1,8 +1,8 @@
 // File-store Today/Tomorrow moves (no Asana calls). Uses a temp copy of the data dir via env-free path swap.
 process.env.TODAY_STORE = 'file'; process.env.READ_ONLY = '1';
 const a = require('assert'), fs = require('fs'), path = require('path');
-const D = path.join(__dirname, '..', 'data'), T = path.join(D, 'today.json'), W = path.join(D, 'tomorrow.json');
-const had = [T, W].map((f) => (fs.existsSync(f) ? fs.readFileSync(f) : null));
+const D = path.join(__dirname, '..', 'data'), T = path.join(D, 'today.json'), W = path.join(D, 'tomorrow.json'), M = path.join(D, 'monday.json');
+const had = [T, W, M].map((f) => (fs.existsSync(f) ? fs.readFileSync(f) : null));
 const S = require('../server');
 const rd = (f) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : {});
 (async () => {
@@ -15,11 +15,15 @@ const rd = (f) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : {
     await a.rejects(S.movePlan({ i, from: { s: 'w', k: 'dm' }, to: { s: 't', k: 'dm' } }), /refused PUT \/tasks\/1111111111111/); a.equal(rd(T)[i], 'dm');
     await S.movePlan({ i, from: { s: 't', k: 'dm' }, to: { s: 't', k: 'dm' } }); // same slot: no date write
     await a.rejects(S.movePlan({ i, from: { s: 't', k: 'dm' }, to: null }), /refused PUT \/tasks\/1111111111111/);
-    a.equal(rd(T)[i], undefined); a.equal(rd(W)[i], undefined);
+    a.equal(rd(T)[i], undefined); a.equal(rd(W)[i], undefined); a.equal(rd(M)[i], undefined);
+    await a.rejects(S.movePlan({ i, from: null, to: { s: 'mo', k: 'dm' } }), /refused PUT \/tasks\/1111111111111/);
+    a.equal(rd(T)[i], undefined); a.equal(rd(W)[i], undefined); a.equal(rd(M)[i], 'dm');
+    await a.rejects(S.movePlan({ i, from: { s: 'mo', k: 'dm' }, to: { s: 'w', k: 'dm' } }), /refused PUT \/tasks\/1111111111111/);
+    a.equal(rd(M)[i], undefined); a.equal(rd(W)[i], 'dm'); a.equal(rd(T)[i], undefined);
     // create: validation happens before any Asana call
     await a.rejects(S.createTask({ name: '054a ', project: '1', a: 'dm' }), /name/);
     await a.rejects(S.createTask({ name: 'PRE', project: '1', a: 'dm' }), /name/);
     await a.rejects(S.movePlan({ i, from: null, to: { s: 'x', k: 'dm' } })); await a.rejects(S.movePlan({ i, from: null, to: { s: 'w', k: 'zz' } }));
     console.log('plan file-store tests: all passed');
-  } finally { [T, W].forEach((f, j) => (had[j] ? fs.writeFileSync(f, had[j]) : fs.rmSync(f, { force: true }))); }
+  } finally { [T, W, M].forEach((f, j) => (had[j] ? fs.writeFileSync(f, had[j]) : fs.rmSync(f, { force: true }))); }
 })().catch((e) => { console.error(e); process.exit(1); });

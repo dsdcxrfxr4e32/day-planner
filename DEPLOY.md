@@ -1,6 +1,6 @@
 # Deploy the day planner on Render (free web service)
 
-The app is stateless on Render: secrets come from env vars, Today/Tomorrow are Asana tags, logs go to stdout.
+The app is stateless on Render: secrets come from env vars, Today/Tomorrow/Monday follow the Asana due date (Today may still add a TODAY-<Name> tag; Tomorrow and Monday never add a tag), logs go to stdout.
 The box copy (`/workspace/day-planner-app`, `./run.sh`, Tailscale Funnel) keeps working unchanged.
 
 ## Env vars to set on Render (names only; values from the box, never commit them)

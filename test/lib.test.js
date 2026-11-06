@@ -45,33 +45,51 @@ a.deepEqual(L.buildNewTask({ name: 'PRE x', notes: '', due_on: '2026-11-02' }), 
 for (const n of ['', '   ', '054a', '054a ', ' PRE ', '054', 'pre']) a.throws(() => L.buildNewTask({ name: n }), /name/);
 a.throws(() => L.buildNewTask({ name: 'PRE x', due_on: '02/11/2026' }), /due date/);
 console.log('new task tests: all passed');
-// placement: a due date wins over TODAY-/TOMORROW- tags. No due date keeps tag planning.
-// Anything that is not today or the next workday (overdue, weekend, later) is Backlog.
-const T0 = '2026-10-28'; // Wednesday; next workday is Thursday
-a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'dm', due: '2026-10-28', today: T0 }), { t: 'dm', w: '', src: 'd' });
-a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'dm', due: '2026-10-29', today: T0 }), { t: '', w: 'dm', src: 'd' });
-a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'dm', due: '2026-10-27', today: T0 }), { t: '', w: '', src: '' });
-a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'dm', due: '', today: T0 }), { t: '', w: '', src: '' });
-a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: T0, today: T0 }), { t: 'dm', w: '', src: 'd' }); // due today agrees with the TODAY tag
-a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: '2026-10-29', today: T0 }), { t: '', w: 'dm', src: 'd' }); // later date beats TODAY tag
-a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: '2026-11-02', today: T0 }), { t: '', w: '', src: '' });
-a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: '2026-10-20', today: T0 }), { t: '', w: '', src: '' }); // overdue is not Today
-a.deepEqual(L.placeByDate({ t: '', w: 'dm', lane: 'dm', due: '2026-10-28', today: T0 }), { t: 'dm', w: '', src: 'd' }); // due today beats a leftover TOMORROW tag
-a.deepEqual(L.placeByDate({ t: '', w: 'dm', lane: 'dm', due: '2026-10-29', today: T0 }), { t: '', w: 'dm', src: 'd' }); // due on the next workday -> Tomorrow
-a.deepEqual(L.placeByDate({ t: '', w: 'dm', lane: 'dm', due: '2026-11-02', today: T0 }), { t: '', w: '', src: '' }); // later than the next workday: Backlog
-a.deepEqual(L.placeByDate({ t: '', w: 'dm', lane: 'dm', due: '2026-10-20', today: T0 }), { t: '', w: '', src: '' }); // overdue beats a TOMORROW tag
-a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'un', due: '2026-10-28', today: T0 }), { t: 'un', w: '', src: 'd' });
-a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: '', today: T0 }), { t: 'dm', w: '', src: '' }); // no due date: tag still plans Today
-a.deepEqual(L.placeByDate({ t: '', w: 'dm', lane: 'dm', due: '', today: T0 }), { t: '', w: 'dm', src: '' }); // no due date: tag still plans Tomorrow
-a.deepEqual(L.placeByDate({ t: 'dm', w: 'dm', lane: 'dm', due: '', today: T0 }), { t: 'dm', w: '', src: '' }); // no due date: Today wins if both tags exist
-const FRI = '2026-11-06'; // Friday; Tomorrow is Monday
-a.equal(L.nextWorkday(FRI), '2026-11-09');
-a.deepEqual(L.placeByDate({ t: '', w: 'dd', lane: 'dd', due: FRI, today: FRI }), { t: 'dd', w: '', src: 'd' }); // leftover TOMORROW-Dimitra, due today
-a.deepEqual(L.placeByDate({ t: 'dd', w: 'dd', lane: 'dd', due: FRI, today: FRI }), { t: 'dd', w: '', src: 'd' });
-a.deepEqual(L.placeByDate({ t: 'dd', w: '', lane: 'dd', due: '2026-11-09', today: FRI }), { t: '', w: 'dd', src: 'd' }); // Friday, due Monday -> Tomorrow
-a.deepEqual(L.placeByDate({ t: '', w: 'dd', lane: 'dd', due: '2026-11-09', today: FRI }), { t: '', w: 'dd', src: 'd' });
-a.deepEqual(L.placeByDate({ t: 'dd', w: '', lane: 'dd', due: '2026-11-10', today: FRI }), { t: '', w: '', src: '' }); // Tuesday is not Today
-a.deepEqual(L.placeByDate({ t: '', w: 'dd', lane: 'dd', due: '2026-11-07', today: FRI }), { t: '', w: '', src: '' }); // Saturday is not the next workday
+// placement: Asana due date wins over leftover TODAY-/TOMORROW- tags.
+// Tomorrow = next calendar day. Monday = the next Monday strictly after today.
+// A tag with no due date does not place the task.
+const T0 = '2026-10-28'; // Wednesday
+const none = { t: '', w: '', mo: '', src: '' };
+a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'dm', due: '2026-10-28', today: T0 }), { t: 'dm', w: '', mo: '', src: 'd' });
+a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'dm', due: '2026-10-29', today: T0 }), { t: '', w: 'dm', mo: '', src: 'd' });
+a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'dm', due: '2026-10-27', today: T0 }), none); // overdue
+a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'dm', due: '', today: T0 }), none);
+a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: T0, today: T0 }), { t: 'dm', w: '', mo: '', src: 'd' });
+a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: '2026-10-29', today: T0 }), { t: '', w: 'dm', mo: '', src: 'd' }); // TODAY tag ignored; due tomorrow
+a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: '2026-11-02', today: T0 }), { t: '', w: '', mo: 'dm', src: 'd' }); // 2 Nov 2026 is the next Monday
+a.deepEqual(L.placeByDate({ t: 'dm', w: 'dm', lane: 'dm', due: '2026-11-03', today: T0 }), none); // Tuesday, neither tomorrow nor Monday
+a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: '2026-10-20', today: T0 }), none); // overdue TODAY tag stays in Backlog
+a.deepEqual(L.placeByDate({ t: '', w: 'dm', lane: 'dm', due: '2026-10-28', today: T0 }), { t: 'dm', w: '', mo: '', src: 'd' }); // due today beats leftover TOMORROW tag
+a.deepEqual(L.placeByDate({ t: '', w: 'dm', lane: 'dm', due: '2026-10-20', today: T0 }), none); // overdue beats a TOMORROW tag
+a.deepEqual(L.placeByDate({ t: '', w: '', lane: 'un', due: '2026-10-28', today: T0 }), { t: 'un', w: '', mo: '', src: 'd' });
+a.deepEqual(L.placeByDate({ t: 'dm', w: '', lane: 'dm', due: '', today: T0 }), none); // no due date: tag does not plan Today
+a.deepEqual(L.placeByDate({ t: '', w: 'dm', lane: 'dm', due: '', today: T0 }), none); // no due date: tag does not plan Tomorrow
+a.deepEqual(L.placeByDate({ t: 'dm', w: 'dm', lane: 'dm', due: '', today: T0 }), none);
 a.equal(L.dueDay({ due_on: '2026-10-28', due_at: '2026-10-28T22:30:00.000Z' }), '2026-10-29'); // 00:30 Athens next day
 a.equal(L.dueDay({ due_on: '2026-10-29', due_at: null }), '2026-10-29'); a.equal(L.dueDay({}), '');
+// Friday 6 Nov 2026: Tomorrow is Saturday 7 Nov, Monday is 9 Nov. Not the old Friday→Monday shortcut.
+const FRI = '2026-11-06';
+a.equal(new Date(FRI + 'T12:00:00Z').getUTCDay(), 5);
+a.equal(L.addDays(FRI, 1), '2026-11-07');
+a.equal(L.nextMonday(FRI), '2026-11-09');
+a.equal(L.nextWorkday(FRI), '2026-11-09'); // old workday shortcut; Tomorrow must not use it
+a.deepEqual(L.boardDates(FRI), { today: FRI, tomorrow: '2026-11-07', monday: '2026-11-09' });
+a.equal(L.slotDue('t', FRI), FRI);
+a.equal(L.slotDue('w', FRI), '2026-11-07');
+a.equal(L.slotDue('mo', FRI), '2026-11-09');
+a.equal(L.slotDue('nope', FRI), null);
+a.deepEqual(L.placeByDate({ t: '', w: 'dd', lane: 'dd', due: FRI, today: FRI }), { t: 'dd', w: '', mo: '', src: 'd' });
+a.deepEqual(L.placeByDate({ lane: 'dd', due: '2026-11-07', today: FRI }), { t: '', w: 'dd', mo: '', src: 'd' });
+a.deepEqual(L.placeByDate({ t: 'dd', w: 'dd', lane: 'dd', due: '2026-11-09', today: FRI }), { t: '', w: '', mo: 'dd', src: 'd' });
+a.deepEqual(L.placeByDate({ lane: 'dd', due: '2026-11-08', today: FRI }), none); // Sunday is backlog
+// Today is Monday: the Monday column is one week later, Today keeps this Monday.
+const MON = '2026-11-09';
+a.equal(L.nextMonday(MON), '2026-11-16');
+a.equal(L.slotDue('w', MON), '2026-11-10');
+a.deepEqual(L.placeByDate({ lane: 'dd', due: MON, today: MON }), { t: 'dd', w: '', mo: '', src: 'd' });
+a.deepEqual(L.placeByDate({ lane: 'dd', due: '2026-11-16', today: MON }), { t: '', w: '', mo: 'dd', src: 'd' });
+// Sunday: tomorrow and the next Monday are the same date, so the card sits in Tomorrow only.
+const SUN = '2026-11-08';
+a.equal(L.addDays(SUN, 1), L.nextMonday(SUN));
+a.deepEqual(L.placeByDate({ lane: 'dd', due: '2026-11-09', today: SUN }), { t: '', w: 'dd', mo: '', src: 'd' });
 console.log('placement tests: all passed');

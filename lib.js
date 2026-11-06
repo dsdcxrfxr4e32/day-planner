@@ -64,11 +64,35 @@ function addDays(ymd, n) {
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 }
 
-// Next working day: Friday (and the weekend) -> Monday.
+// Next weekday: Saturday and Sunday move forward to Monday. The planner does not use this
+// for Tomorrow (that column is the next calendar day). Monday has its own column.
 function nextWorkday(ymd) {
   let d = addDays(ymd, 1);
   while ([0, 6].includes(new Date(d + 'T12:00:00Z').getUTCDay())) d = addDays(d, 1);
   return d;
+}
+
+// The Monday strictly after `ymd`. If `ymd` is itself a Monday, that is one week later
+// (Today already covers this Monday). Weekday is read at UTC noon so the calendar date
+// does not shift. When this Monday is also tomorrow (a Sunday), the dates are equal.
+function nextMonday(ymd) {
+  let d = addDays(ymd, 1);
+  while (new Date(d + 'T12:00:00Z').getUTCDay() !== 1) d = addDays(d, 1);
+  return d;
+}
+
+// Dates the board columns use (Europe/Athens calendar days, not plan tags).
+function boardDates(today) {
+  return { today, tomorrow: addDays(today, 1), monday: nextMonday(today) };
+}
+
+// Due date written when a card moves into a column. 't' today, 'w' tomorrow, 'mo' next Monday.
+function slotDue(s, today) {
+  const b = boardDates(today);
+  if (s === 't') return b.today;
+  if (s === 'w') return b.tomorrow;
+  if (s === 'mo') return b.monday;
+  return null;
 }
 
 // App save: the first line must be a D-code (same DCODE_RE as the parser); otherwise
@@ -125,18 +149,21 @@ function buildNewTask(input) {
   return out;
 }
 
-// Column placement. An Asana due date (Athens day) wins over leftover TODAY-/TOMORROW- tags:
-// due today -> Today (even with a TOMORROW tag), due the next workday -> Tomorrow (Friday -> Monday),
-// any other due date -> Backlog. A date later than today never sits in Today, whatever the tags say.
-// With no due date, an explicit tag still places the task (Today wins if both). lane = the assignee key.
-function placeByDate({ t, w, lane, due, today }) {
-  if (due && due === today) return { t: lane, w: '', src: 'd' };
-  if (due && due === nextWorkday(today)) return { t: '', w: lane, src: 'd' };
-  if (due) return { t: '', w: '', src: '' };
-  if (t || w) return { t: t || '', w: t ? '' : w || '', src: '' };
-  return { t: '', w: '', src: '' };
+// Column placement follows the Asana due date only (Athens calendar day). Plan tags
+// (TODAY-/TOMORROW-<Name>, passed as t/w if a caller still has them) are ignored,
+// including when the task has no due date.
+// due today -> Today, due tomorrow (the next calendar day) -> Tomorrow,
+// due the next Monday strictly after today -> Monday, anything else (overdue, later, blank) -> Backlog.
+// lane = the assignee key. A task is in at most one column: if tomorrow is that Monday (Sunday),
+// Tomorrow wins because it is checked first. src 'd' means the due date placed the card.
+function placeByDate({ lane, due, today }) {
+  const { tomorrow, monday } = boardDates(today);
+  if (due && due === today) return { t: lane, w: '', mo: '', src: 'd' };
+  if (due && due === tomorrow) return { t: '', w: lane, mo: '', src: 'd' };
+  if (due && due === monday) return { t: '', w: '', mo: lane, src: 'd' };
+  return { t: '', w: '', mo: '', src: '' };
 }
 // Due date of an Asana task as an Athens day: due_at (a time) wins, else due_on.
 function dueDay(t) { return t.due_at ? athensDate(t.due_at) : t.due_on || ''; }
 
-module.exports = { DEFAULT_MIN, DEFAULT_DCODE, MIN_MIN, clampMinutes, placeByDate, dueDay, buildNewTask, ensureDCode, buildTaskUpdate, DCODE_RE, minutesFromNotes, formatDCode, rewritePlainNotes, rewriteHtmlNotes, isPlainHtml, athensDate, addDays, nextWorkday };
+module.exports = { DEFAULT_MIN, DEFAULT_DCODE, MIN_MIN, clampMinutes, placeByDate, dueDay, buildNewTask, ensureDCode, buildTaskUpdate, DCODE_RE, minutesFromNotes, formatDCode, rewritePlainNotes, rewriteHtmlNotes, isPlainHtml, athensDate, addDays, nextWorkday, nextMonday, boardDates, slotDue };

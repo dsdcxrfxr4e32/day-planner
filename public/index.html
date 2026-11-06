@@ -171,12 +171,12 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   .fbody.open{display:block}
   /* one column at a time per person, chosen with a sticky segmented control */
   .seg{display:flex;position:sticky;top:0;z-index:40;gap:4px;padding:6px 0;margin:0 0 8px;background:var(--bg)}
-  .seg button{flex:1 1 0;min-width:0;min-height:48px;border:1px solid var(--bd);background:var(--subtle);color:var(--t2);border-radius:10px;font:600 14px/18px inherit;font-family:inherit;padding:4px 3px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .seg button .small{font-weight:400;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .seg button{flex:1 1 0;min-width:0;min-height:48px;border:1px solid var(--bd);background:var(--subtle);color:var(--t2);border-radius:10px;font:600 12px/14px inherit;font-family:inherit;padding:4px 2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .seg button .small{font-size:10px;font-weight:400;font-variant-numeric:tabular-nums;white-space:nowrap}
   .seg button.on{background:var(--acc);border-color:var(--focus);color:var(--t1)}
   .lane{display:block}
   .lane .colwrap{display:none}
-  .lane[data-tab=b] .colwrap[data-kind=b],.lane[data-tab=t] .colwrap[data-kind=t],.lane[data-tab=w] .colwrap[data-kind=w],.lane[data-tab=a] .colwrap[data-kind=a]{display:flex}
+  .lane[data-tab=b] .colwrap[data-kind=b],.lane[data-tab=t] .colwrap[data-kind=t],.lane[data-tab=w] .colwrap[data-kind=w],.lane[data-tab=mo] .colwrap[data-kind=mo],.lane[data-tab=a] .colwrap[data-kind=a]{display:flex}
   .col{padding:10px;min-height:80px}
   .scroll{max-height:none;overflow:visible;padding-right:0}
   .grphd .lbl{font-size:18px}
@@ -192,7 +192,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   .ac{min-height:40px;padding:0 14px;font-size:13px;flex:1 1 auto}
   .ctl{gap:6px}
   .ctl>span[style*="flex:1"]{flex-basis:100%!important;height:0}
-  .ctl>.btn[data-act=today],.ctl>.btn[data-act=tomorrow],.ctl>.btn[data-act=back]{flex:1 1 0}
+  .ctl>.btn[data-act=today],.ctl>.btn[data-act=tomorrow],.ctl>.btn[data-act=monday],.ctl>.btn[data-act=back]{flex:1 1 0}
   .mblk{padding:10px 12px}
   .mall{line-height:22px;padding:4px 12px}
   .mlist{left:0;right:0}
@@ -271,7 +271,8 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   function hm(m) { var h = Math.floor(m / 60), r = m % 60; return h + ':' + (r < 10 ? '0' : '') + r; }
   function fmtDate(d) { if (!d) return 'No due date'; var p = d.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
   function today() { return S.board.today; }
-  // 'Tomorrow', or the weekday name when the next working day isn't tomorrow (Friday -> Monday)
+  // Tomorrow is always the next calendar day, so the button stays "Tomorrow".
+  // (Friday no longer relabels it Monday; that day has its own Monday column.)
   function tomLbl() {
     var t = S.board.today, w = S.board.tomorrow; if (!t || !w) return 'Tomorrow';
     var a = Date.parse(t + 'T12:00:00Z'), b = Date.parse(w + 'T12:00:00Z');
@@ -356,28 +357,31 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
       api('POST', '/api/minutes', { i: id, m: want }).catch(function (e) { showErr('Minutes not saved for "' + x.n.slice(0, 40) + '": ' + e.message); });
     }, 700);
   }
-  // slot: 't' (Today), 'w' (Tomorrow) or '' (Backlog). A task sits in at most one of Today/Tomorrow.
-  // Untagged tasks sit in Today/Tomorrow by due date (src 'd'); re-place them after a date change.
-  // force: the due date was just edited, so the server dropped any Today/Tomorrow tag; place by date only.
+  // slot: 't' Today, 'w' Tomorrow, 'mo' Monday, or '' Backlog. A task sits in at most one of them.
+  // The column is the Asana due date (src 'd'). A leftover plan tag does not keep a card where it is.
+  // force: the due date was just edited; place by that date.
   function replace(x, force) {
-    if (!x || (!force && x.src !== 'd' && (x.t || x.w))) return;
-    var lane = x.a;
-    x.t = x.d && x.d === S.board.today ? lane : ''; x.w = x.d && x.d === S.board.tomorrow ? lane : '';
-    x.src = x.t || x.w ? 'd' : '';
+    if (!x || (!force && x.src !== 'd' && (x.t || x.w || x.mo))) return;
+    var lane = x.a, d = x.d, b = S.board;
+    x.t = d && d === b.today ? lane : '';
+    x.w = !x.t && d && d === b.tomorrow ? lane : '';
+    x.mo = !x.t && !x.w && d && d === b.monday ? lane : '';
+    x.src = x.t || x.w || x.mo ? 'd' : '';
   }
-  function slotOf(x) { return x.t ? { s: 't', k: x.t } : x.w ? { s: 'w', k: x.w } : null; }
+  function slotOf(x) { return x.t ? { s: 't', k: x.t } : x.w ? { s: 'w', k: x.w } : x.mo ? { s: 'mo', k: x.mo } : null; }
   function moveTo(id, slot, k) {
     var x = S.byId[id]; if (!x) return;
     var from = slotOf(x), to = slot ? { s: slot, k: k } : null;
     if (to && !canTake(x, k)) return render();
     if ((!from && !to) || (from && to && from.s === to.s && from.k === to.k)) return render();
-    var oldT = x.t, oldW = x.w, oldD = x.d, oldSrc = x.src; x.src = '';
-    x.t = slot === 't' ? k : ''; x.w = slot === 'w' ? k : '';
-    // due date follows the column (server sets it in the same call): Today = today, Tomorrow = tomorrow, Backlog = none
-    x.d = slot === 't' ? S.board.today : slot === 'w' ? S.board.tomorrow : '';
+    var oldT = x.t, oldW = x.w, oldMo = x.mo, oldD = x.d, oldSrc = x.src;
+    x.t = slot === 't' ? k : ''; x.w = slot === 'w' ? k : ''; x.mo = slot === 'mo' ? k : '';
+    // due date follows the column (server sets it in the same call): Today, Tomorrow, Monday, or none
+    x.d = slot === 't' ? S.board.today : slot === 'w' ? S.board.tomorrow : slot === 'mo' ? S.board.monday : '';
+    x.src = x.d ? 'd' : '';
     render();
-    api('POST', '/api/plan', { i: id, from: from, to: to }).then(function (r) { if (r && r.d !== undefined && x.d !== r.d) { x.d = r.d; render(); } }).catch(function (e) {
-      x.t = oldT; x.w = oldW; x.d = oldD; x.src = oldSrc; showErr('Could not move "' + x.n.slice(0, 40) + '": ' + e.message + ' — Refresh to see the real state.');
+    api('POST', '/api/plan', { i: id, from: from, to: to }).then(function (r) { if (r && r.d !== undefined && x.d !== r.d) { x.d = r.d; replace(x, true); render(); } }).catch(function (e) {
+      x.t = oldT; x.w = oldW; x.mo = oldMo; x.d = oldD; x.src = oldSrc; showErr('Could not move "' + x.n.slice(0, 40) + '": ' + e.message + ' — Refresh to see the real state.');
     });
   }
   function assignChips(x, attr) {
@@ -390,15 +394,16 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   // Clicking the current assignee unassigns; another name reassigns. A planned task keeps its column under the new person.
   function assign(id, k) {
     var x = S.byId[id]; if (!x) return Promise.resolve();
-    var newA = x.a === k ? 'un' : k, from = slotOf(x), old = { a: x.a, t: x.t, w: x.w };
-    x.a = newA; if (x.t) x.t = newA; if (x.w) x.w = newA; render();
+    var newA = x.a === k ? 'un' : k, from = slotOf(x), old = { a: x.a, t: x.t, w: x.w, mo: x.mo };
+    x.a = newA; if (x.t) x.t = newA; if (x.w) x.w = newA; if (x.mo) x.mo = newA; render();
     return api('POST', '/api/assign', { i: id, a: newA, from: from }).catch(function (e) {
-      x.a = old.a; x.t = old.t; x.w = old.w; showErr('Could not reassign "' + x.n.slice(0, 40) + '": ' + e.message + ' — Refresh to see the real state.');
+      x.a = old.a; x.t = old.t; x.w = old.w; x.mo = old.mo; showErr('Could not reassign "' + x.n.slice(0, 40) + '": ' + e.message + ' — Refresh to see the real state.');
       throw e;
     });
   }
   function toToday(id, k) { moveTo(id, 't', k); }
   function toTomorrow(id, k) { moveTo(id, 'w', k); }
+  function toMonday(id, k) { moveTo(id, 'mo', k); }
   function toBacklog(id) { moveTo(id, '', ''); }
   function clearToday() {
     var list = tasks().filter(function (x) { return x.t && (S.who === 'all' || x.t === S.who); });
@@ -440,14 +445,16 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     h += '<button class="btn" data-act="bump" data-d="10" data-id="' + x.i + '" aria-label="Plus 10 minutes">+10</button>';
     if (!x.e && !done) h += '<span class="small">no estimate</span>';
     h += '<span style="flex:1"></span>';
-    var tk = kind === 'b' ? k : (x.t || x.w || k);
+    var tk = kind === 'b' ? k : (x.t || x.w || x.mo || k);
     var bToday = '<button class="btn" data-act="today" data-id="' + x.i + '" data-k="' + tk + '">Today →</button>';
     var bTom = '<button class="btn" data-act="tomorrow" data-id="' + x.i + '" data-k="' + tk + '">' + tomLbl() + ' →</button>';
+    var bMon = '<button class="btn" data-act="monday" data-id="' + x.i + '" data-k="' + tk + '">Monday →</button>';
     var bBack = '<button class="btn" data-act="back" data-id="' + x.i + '">← Backlog</button>';
     if (!done) {
-      if (kind === 't') h += bTom + bBack;
-      else if (kind === 'w') h += bToday.replace('Today →', '← Today') + bBack;
-      else if (canTake(x, k)) h += bToday + bTom;
+      if (kind === 't') h += bTom + bMon + bBack;
+      else if (kind === 'w') h += bToday.replace('Today →', '← Today') + bMon + bBack;
+      else if (kind === 'mo') h += bToday.replace('Today →', '← Today') + bTom + bBack;
+      else if (canTake(x, k)) h += bToday + bTom + bMon;
     }
     return h + '</div></div>';
   }
@@ -473,7 +480,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     return h + '</div>';
   }
   // Which of a lane's columns a task sits in: 't' Today, 'w' Tomorrow, 'b' Backlog.
-  function colOf(x, k) { return x.t === k ? 't' : x.w === k ? 'w' : 'b'; }
+  function colOf(x, k) { return x.t === k ? 't' : x.w === k ? 'w' : x.mo === k ? 'mo' : 'b'; }
   // All people: one merged board, every open task grouped by client (like the Asana project list).
   function everyone() {
     var items = tasks().filter(function (x) { return !x.c || S.showDone; }).sort(byDue);
@@ -482,7 +489,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     h += '<div class="colhd"><b>All tasks by client</b><span class="small">' + items.length + (items.length === 1 ? ' task' : ' tasks') + ' · ' + hm(sum(items)) + '</span></div><div class="scroll">';
     groupTasks(items).forEach(function (grp) {
       h += '<div class="grp"><div class="grphd"><span class="lbl">' + esc(grp.g.label) + '</span><span class="small">' + grp.xs.length + ' · ' + hm(sum(grp.xs)) + '</span></div>';
-      grp.xs.forEach(function (x) { var k = x.a || 'un'; h += card(x, x.t ? 't' : x.w ? 'w' : 'b', k); });
+      grp.xs.forEach(function (x) { var k = x.a || 'un'; h += card(x, x.t ? 't' : x.w ? 'w' : x.mo ? 'mo' : 'b', k); });
       h += '</div>';
     });
     if (!items.length) h += '<div class="small empty">No open tasks</div>';
@@ -502,7 +509,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
       h += '<div class="grp"><div class="grphd"><span class="lbl">' + esc(grp.g.label) + add + '</span><span class="small">' + own.length + ' · ' + hm(sum(own)) +
         (un.length ? '<span style="opacity:.8">  + ' + un.length + ' unassigned · ' + hm(sum(un)) + '</span>' : '') + '</span></div>';
       if (kind === 'a') { // All: sub-headed by the column each task is in; buttons as in that column
-        [['t', 'Today'], ['w', tomLbl()], ['b', 'Backlog']].forEach(function (c) {
+        [['t', 'Today'], ['w', tomLbl()], ['mo', 'Monday'], ['b', 'Backlog']].forEach(function (c) {
           var xs = own.concat(un).filter(function (x) { return colOf(x, k) === c[0]; });
           if (!xs.length) return;
           h += '<div class="colsub"><span>' + c[1] + '</span><span>' + xs.length + ' · ' + hm(sum(xs)) + '</span></div>';
@@ -516,6 +523,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     });
     if (!items.length && kind === 't') h += '<div class="small empty">Drag tasks here or press Today →</div>';
     if (!items.length && kind === 'w') h += '<div class="small empty">Drag tasks here or press ' + tomLbl() + ' →</div>';
+    if (!items.length && kind === 'mo') h += '<div class="small empty">Drag tasks here or press Monday →</div>';
     if (!items.length && kind === 'a') h += '<div class="small empty">No open tasks</div>';
     return h + '</div></div>';
   }
@@ -584,30 +592,33 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     people.filter(function (p) { return S.who !== 'all' && p.k === S.who; }).forEach(function (p) {
       var mine = tasks().filter(function (x) { return x.a === p.k; });
       var openN = mine.filter(function (x) { return !x.c; }).length, doneN = mine.length - openN;
-      var free = mine.filter(function (x) { return !x.t && !x.w; });
+      var free = mine.filter(function (x) { return !x.t && !x.w && !x.mo; });
       var backOpen = free.filter(function (x) { return !x.c && dueOk(x); }).sort(byDue);
       var backDone = S.showDone ? free.filter(function (x) { return x.c; }).sort(function (a, b) { return a.c < b.c ? 1 : a.c > b.c ? -1 : 0; }) : [];
       var back = backOpen.concat(backDone);
       var todayItems = tasks().filter(function (x) { return x.t === p.k && (!x.c || S.showDone); });
       var tomItems = tasks().filter(function (x) { return x.w === p.k && (!x.c || S.showDone); });
-      var gray = p.k === 'un' ? [] : tasks().filter(function (x) { return x.a === 'un' && !x.c && !x.t && !x.w && dueOk(x); }).sort(byDue);
-      var day = plannedDay(p.k), tomAll = tasks().filter(function (x) { return x.w === p.k; });
-      var mtT = meetFor(p.k, 'today'), mtW = meetFor(p.k, 'tomorrow');
+      var monItems = tasks().filter(function (x) { return x.mo === p.k && (!x.c || S.showDone); });
+      var gray = p.k === 'un' ? [] : tasks().filter(function (x) { return x.a === 'un' && !x.c && !x.t && !x.w && !x.mo && dueOk(x); }).sort(byDue);
+      var day = plannedDay(p.k), tomAll = tasks().filter(function (x) { return x.w === p.k; }), monAll = tasks().filter(function (x) { return x.mo === p.k; });
+      var mtT = meetFor(p.k, 'today'), mtW = meetFor(p.k, 'tomorrow'), mtM = meetFor(p.k, 'monday');
       var cntToday = loadCard('Today', sum(day), sum(day.filter(function (x) { return x.c; })), 'cmp', mtT, 't-' + p.k);
       var cntTom = loadCard(tomLbl(), sum(tomAll.filter(function (x) { return !x.c; })), sum(tomAll.filter(function (x) { return x.c; })), 'cmp', mtW, 'w-' + p.k);
+      var cntMon = loadCard('Monday', sum(monAll.filter(function (x) { return !x.c; })), sum(monAll.filter(function (x) { return x.c; })), 'cmp', mtM, 'mo-' + p.k);
       // spacer above Backlog: an invisible copy of a counter, so the three columns line up exactly
       var cntSpacer = loadCard('Backlog', 0, 0, 'cmp spacer', mtT, 'spacer');
       // All (mobile tab): every open task of the lane, once each, whatever column it is in
-      var seenA = {}, allItems = backOpen.concat(todayItems, tomItems).filter(function (x) { if (x.c || seenA[x.i]) return false; seenA[x.i] = 1; return true; });
+      var seenA = {}, allItems = backOpen.concat(todayItems, tomItems, monItems).filter(function (x) { if (x.c || seenA[x.i]) return false; seenA[x.i] = 1; return true; });
       var tab = S.tab[p.k] || 't';
       var segB = function (kd, lbl, n, min) { return '<button data-act="mtab" data-k="' + p.k + '" data-kind="' + kd + '" class="' + (tab === kd ? 'on' : '') + '" aria-pressed="' + (tab === kd) + '">' + lbl + '<span class="small">' + n + ' · ' + hm(min) + '</span></button>'; };
       h += '<section><h2>' + esc(p.name) + ' · ' + openN + ' open' + (S.showDone ? ' · ' + doneN + ' completed in 14 days' : '') + '</h2>';
-      h += '<div class="seg" role="group" aria-label="' + esc(p.name) + ' columns">' + segB('a', 'All', allItems.length, sum(allItems)) + segB('b', 'Backlog', back.length, sum(back)) + segB('t', 'Today', todayItems.length, sum(day)) + segB('w', tomLbl(), tomItems.length, sum(tomItems.filter(function (x) { return !x.c; }))) + '</div>';
+      h += '<div class="seg" role="group" aria-label="' + esc(p.name) + ' columns">' + segB('a', 'All', allItems.length, sum(allItems)) + segB('b', 'Backlog', back.length, sum(back)) + segB('t', 'Today', todayItems.length, sum(day)) + segB('w', tomLbl(), tomItems.length, sum(tomItems.filter(function (x) { return !x.c; }))) + segB('mo', 'Monday', monItems.length, sum(monItems.filter(function (x) { return !x.c; }))) + '</div>';
       h += '<div class="lane" data-tab="' + tab + '">';
       h += '<div class="colwrap" data-kind="a">' + column(p.k, 'a', 'All open', allItems, sum(allItems)) + '</div>';
       h += '<div class="colwrap" data-kind="b">' + cntSpacer + column(p.k, 'b', 'Backlog', back, sum(back), gray) + '</div>';
       h += '<div class="colwrap" data-kind="t">' + cntToday + column(p.k, 't', 'Today', todayItems, sum(plannedDay(p.k)), null, mtT) + '</div>';
       h += '<div class="colwrap" data-kind="w">' + cntTom + column(p.k, 'w', tomLbl(), tomItems, sum(tomItems.filter(function (x) { return !x.c; })), null, mtW) + '</div>';
+      h += '<div class="colwrap" data-kind="mo">' + cntMon + column(p.k, 'mo', 'Monday', monItems, sum(monItems.filter(function (x) { return !x.c; })), null, mtM) + '</div>';
       h += '</div></section>';
     });
 
@@ -637,9 +648,9 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   function saveDue(id, d) {
     var x = S.byId[id]; S.dueEdit = null;
     if (!x || d === x.d) return render();
-    var old = { d: x.d, t: x.t, w: x.w, src: x.src }; x.d = d; replace(x, true); render();
+    var old = { d: x.d, t: x.t, w: x.w, mo: x.mo, src: x.src }; x.d = d; replace(x, true); render();
     api('POST', '/api/task/' + id, { due_on: d }).then(function (r) { x.d = r.d; replace(x, true); render(); })
-      .catch(function (e) { x.d = old.d; x.t = old.t; x.w = old.w; x.src = old.src; showErr('Due date not saved: ' + e.message); });
+      .catch(function (e) { x.d = old.d; x.t = old.t; x.w = old.w; x.mo = old.mo; x.src = old.src; showErr('Due date not saved: ' + e.message); });
   }
 
   /* ---------- task editor (Asana-style side pane) ---------- */
@@ -661,7 +672,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     S.dueEdit = null;
     S.ed = { id: '', isNew: true, loading: false, err: '', saving: false,
       ctx: { pg: b.getAttribute('data-pg'), kind: kind, k: k, pre: b.getAttribute('data-pre') },
-      data: { n: b.getAttribute('data-pre'), notes: 'D10M\n', d: kind === 't' ? S.board.today : kind === 'w' ? S.board.tomorrow : '', a: k === 'un' ? 'un' : k, p: b.getAttribute('data-pn'), par: '' } };
+      data: { n: b.getAttribute('data-pre'), notes: 'D10M\n', d: kind === 't' ? S.board.today : kind === 'w' ? S.board.tomorrow : kind === 'mo' ? S.board.monday : '', a: k === 'un' ? 'un' : k, p: b.getAttribute('data-pn'), par: '' } };
     paintEditor();
     var n = modal.querySelector('.tname'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
   }
@@ -670,7 +681,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     var E = S.ed; if (!E) { modal.innerHTML = ''; return; }
     var x = S.byId[E.id] || {}, t = E.data;
     var h = '<div class="mbg" data-mbg="1"><div class="pane" role="dialog" aria-modal="true" aria-label="Edit task">';
-    h += '<div class="phd"><span class="small">' + (E.isNew ? 'New task' + (E.ctx.kind === 't' ? ' · Today' : E.ctx.kind === 'w' ? ' · ' + tomLbl() : '') : t && t.completed ? '✓ Completed task' : 'Task') + '</span><button class="btn bbig" data-ed="cancel" aria-label="Close">✕</button></div><div class="pbody">';
+    h += '<div class="phd"><span class="small">' + (E.isNew ? 'New task' + (E.ctx.kind === 't' ? ' · Today' : E.ctx.kind === 'w' ? ' · ' + tomLbl() : E.ctx.kind === 'mo' ? ' · Monday' : '') : t && t.completed ? '✓ Completed task' : 'Task') + '</span><button class="btn bbig" data-ed="cancel" aria-label="Close">✕</button></div><div class="pbody">';
     if (E.err) h += '<div class="perr">' + esc(E.err) + '</div>';
     if (E.loading) h += '<div class="loading" style="padding:30px"><span class="spin"></span> Loading from Asana…</div>';
     else if (t) {
@@ -726,12 +737,12 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   function saveNew(E, v, nm) {
     if (/^(\d{3}[a-z]?|PRE)$/i.test(nm)) { E.err = 'Type a task name after ' + nm + '.'; return paintEditor(); }
     var a = E.data.a, c = E.ctx, slotK = a !== 'un' ? a : c.k;
-    var body = { name: nm, notes: v.notes, due_on: v.due_on, project: c.pg, a: a, slot: c.kind === 't' || c.kind === 'w' ? { s: c.kind, k: slotK } : null };
+    var body = { name: nm, notes: v.notes, due_on: v.due_on, project: c.pg, a: a, slot: c.kind === 't' || c.kind === 'w' || c.kind === 'mo' ? { s: c.kind, k: slotK } : null };
     E.saving = true; E.err = ''; paintEditor();
     api('POST', '/api/task', body).then(function (x) {
       E.saving = false; S.ed = null; modal.innerHTML = '';
       S.board.tasks.push(x); S.byId[x.i] = x; render();
-      if (!x.tagged) showErr('Task created, but it could not be added to ' + (c.kind === 't' ? 'Today' : tomLbl()) + '; it is in the Backlog.');
+      if (!x.tagged) showErr('Task created, but it could not be added to ' + (c.kind === 't' ? 'Today' : c.kind === 'mo' ? 'Monday' : tomLbl()) + '; it is in the Backlog.');
     }).catch(function (e) { E.saving = false; E.err = 'Not created: ' + e.message; paintEditor(); });
   }
   modal.addEventListener('click', function (e) {
@@ -766,6 +777,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     else if (act === 'bump') bump(id, Number(b.getAttribute('data-d')));
     else if (act === 'today') toToday(id, b.getAttribute('data-k'));
     else if (act === 'tomorrow') toTomorrow(id, b.getAttribute('data-k'));
+    else if (act === 'monday') toMonday(id, b.getAttribute('data-k'));
     else if (act === 'assign') assign(id, b.getAttribute('data-k')).catch(function () {});
     else if (act === 'back') toBacklog(id);
     else if (act === 'who') { S.who = b.getAttribute('data-k'); render(); }
@@ -813,7 +825,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     var id = e.dataTransfer.getData('text/plain') || S.drag, x = S.byId[id], k = z.getAttribute('data-k'), kind = z.getAttribute('data-kind');
     S.drag = null; S.over = null;
     if (!x || !canTake(x, k)) return render();
-    if (kind === 't') toToday(id, k); else if (kind === 'w') toTomorrow(id, k); else if (x.t === k || x.w === k) toBacklog(id); else render();
+    if (kind === 't') toToday(id, k); else if (kind === 'w') toTomorrow(id, k); else if (kind === 'mo') toMonday(id, k); else if (x.t === k || x.w === k || x.mo === k) toBacklog(id); else render();
   });
 
   // back/forward cache restore: fetch a fresh page instead of showing the frozen one
