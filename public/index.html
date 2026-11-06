@@ -579,7 +579,8 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     return h;
   }
   function loadCard(label, taskMin, doneMin, extraCls, mt, key) {
-    var cap = S.board.cap, meetMin = (S.showCal && mt && mt.min) ? mt.min : 0, m = taskMin + meetMin, overCap = m > cap, pct = Math.min(100, m / cap * 100);
+    // Meeting minutes always count. Show calendar only hides the list (meetLine / meetingBlocks).
+    var cap = S.board.cap, meetMin = (mt && mt.min) ? mt.min : 0, m = taskMin + meetMin, overCap = m > cap, pct = Math.min(100, m / cap * 100);
     var mPct = Math.min(100, meetMin / cap * 100), tPct = Math.max(0, pct - mPct);
     var h = '<div class="load' + (extraCls ? ' ' + extraCls : '') + '"><div class="hd"><span style="color:var(--t2)">' + esc(label) + '</span><span class="small' + (overCap ? ' over' : '') + '">' + (overCap ? 'Over by ' + hm(m - cap) : hm(Math.max(0, cap - m)) + ' free') + '</span></div>';
     h += '<div class="metric' + (overCap ? ' over' : '') + '">' + hm(m) + ' <span style="font-size:14px;color:var(--t3);font-weight:400">/ 8:00</span></div>';
