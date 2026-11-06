@@ -125,14 +125,15 @@ function buildNewTask(input) {
   return out;
 }
 
-// Column placement: explicit TODAY-/TOMORROW- tags win; otherwise the due date (Athens) decides:
-// due today -> Today, due tomorrow -> Tomorrow, anything else (incl. overdue) -> Backlog. lane = the assignee key.
-// A due date later than today never sits in Today, whatever the tags say: it goes by date instead.
+// Column placement. An Asana due date (Athens day) wins over leftover TODAY-/TOMORROW- tags:
+// due today -> Today (even with a TOMORROW tag), due the next workday -> Tomorrow (Friday -> Monday),
+// any other due date -> Backlog. A date later than today never sits in Today, whatever the tags say.
+// With no due date, an explicit tag still places the task (Today wins if both). lane = the assignee key.
 function placeByDate({ t, w, lane, due, today }) {
-  if (t && due && due > today) { t = ''; w = ''; }
-  if (t || w) return { t: t || '', w: t ? '' : w || '', src: '' };
   if (due && due === today) return { t: lane, w: '', src: 'd' };
   if (due && due === nextWorkday(today)) return { t: '', w: lane, src: 'd' };
+  if (due) return { t: '', w: '', src: '' };
+  if (t || w) return { t: t || '', w: t ? '' : w || '', src: '' };
   return { t: '', w: '', src: '' };
 }
 // Due date of an Asana task as an Athens day: due_at (a time) wins, else due_on.
