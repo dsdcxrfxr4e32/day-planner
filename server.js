@@ -13,6 +13,7 @@ const DIR = __dirname;
 // required comes from env; files there are only a fallback or a cache.
 const DATA = process.env.DATA_DIR || path.join(DIR, 'data');
 const ON_RENDER = !!process.env.RENDER; // Render sets RENDER=true in every service
+const ON_VERCEL = !!process.env.VERCEL; // Vercel sets VERCEL=1; functions are stateless and the disk is read-only
 try { fs.mkdirSync(DATA, { recursive: true }); } catch (e) { console.error('data dir not writable:', e.message); }
 
 const CFG = {
@@ -48,7 +49,7 @@ function loadAccessKey() {
   const env = String(process.env.ACCESS_KEY || '').trim();
   if (env) return env;
   try { const f = fs.readFileSync(KEY_FILE, 'utf8').trim(); if (f) return f; } catch { /* no file */ }
-  if (ON_RENDER) { console.error('FATAL: ACCESS_KEY is not set (required on Render)'); process.exit(1); }
+  if (ON_RENDER || ON_VERCEL) { console.error('FATAL: ACCESS_KEY is not set (required on Render and Vercel)'); process.exit(1); }
   const k = crypto.randomBytes(18).toString('base64url');
   try { fs.writeFileSync(KEY_FILE, k, { mode: 0o600 }); } catch (e) { console.error('access key not persisted:', e.message); }
   return k;
@@ -461,9 +462,9 @@ async function createTask(body) {
 /* ---------- HTTP ---------- */
 const ROUTES = { '/api/completed': setCompleted, '/api/minutes': setMinutes, '/api/today': setToday, '/api/clear-today': clearToday, '/api/plan': movePlan, '/api/assign': assignTask, '/api/task': createTask };
 
-// Build id: the deployed commit on Render, else the process start. The page carries it and reloads
-// itself when /api/board reports a different one (a tab left open across a deploy).
-const BUILD = String(process.env.RENDER_GIT_COMMIT || Date.now().toString(36)).slice(0, 12);
+// Build id: the deployed commit. Stable across instances so a Vercel cold start does not
+// look like a new deploy. The page reloads itself when /api/board reports a different one.
+const BUILD = String(process.env.VERCEL_GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || 'dev').slice(0, 12);
 const HTML_HEADERS = { 'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0', Pragma: 'no-cache', Expires: '0' };
 function send(res, status, body, type, extra) {
   res.writeHead(status, { 'Content-Type': type || 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer', ...(extra || {}) });
@@ -476,21 +477,51 @@ function keyOk(req, url) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://x');
+const hdr = (req, name) => {
+  const v = req.headers && req.headers[name];
+  return Array.isArray(v) ? v[0] : v;
+};
+
+// Path the app routes on. Render passes the client path in req.url. Vercel may pass the
+// function path (/api/...) plus the original path in x-invoke-path / x-invoke-query.
+// / and /healthz are rewritten to /api/page and /api/healthz; map those back.
+function incomingUrl(req) {
+  let raw = req.url || '/';
+  const invoked = hdr(req, 'x-invoke-path');
+  if (typeof invoked === 'string' && invoked.startsWith('/') && invoked !== '/api' && !invoked.startsWith('/api/')) {
+    const q = hdr(req, 'x-invoke-query');
+    raw = q ? invoked + '?' + String(q) : invoked;
+  }
+  const u = new URL(raw, 'http://x');
+  if (u.pathname === '/api/page') u.pathname = '/';
+  else if (u.pathname === '/api/healthz') u.pathname = '/healthz';
+  else if (u.pathname === '/api/index.html') u.pathname = '/index.html';
+  return u.pathname + u.search;
+}
+
+async function readBody(req) {
+  if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) return req.body;
+  if (typeof req.body === 'string') return req.body ? JSON.parse(req.body) : {};
+  let raw = '';
+  if (req[Symbol.asyncIterator]) {
+    for await (const chunk of req) { raw += chunk; if (raw.length > 1e6) throw Object.assign(new Error('too large'), { status: 413 }); }
+  }
+  return raw ? JSON.parse(raw) : {};
+}
+
+async function handle(req, res) {
+  const url = new URL(incomingUrl(req), 'http://x');
   try {
     if (url.pathname === '/healthz') return send(res, 200, { ok: true });
     if (!keyOk(req, url)) return send(res, 403, '<h1>403</h1><p>This link needs its access key.</p>', 'text/html; charset=utf-8', HTML_HEADERS);
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-      return send(res, 200, fs.readFileSync(path.join(DIR, 'public', 'index.html'), 'utf8').replace('__BUILD__', BUILD), 'text/html; charset=utf-8', HTML_HEADERS);
+      return send(res, 200, fs.readFileSync(path.join(DIR, 'public', 'index.html'), 'utf8').replace(/__BUILD__/g, BUILD), 'text/html; charset=utf-8', HTML_HEADERS);
     }
     if (req.method === 'GET' && url.pathname === '/api/board') return send(res, 200, { ...(await getBoard(url.searchParams.get('refresh') === '1')), build: BUILD });
     const tm = /^\/api\/task\/(\d{5,25})$/.exec(url.pathname);
     if (tm && req.method === 'GET') return send(res, 200, await getTask(tm[1]));
     if (req.method === 'POST' && (ROUTES[url.pathname] || tm)) {
-      let raw = '';
-      for await (const chunk of req) { raw += chunk; if (raw.length > 1e6) throw Object.assign(new Error('too large'), { status: 413 }); }
-      const body = raw ? JSON.parse(raw) : {};
+      const body = await readBody(req);
       const out = tm ? await updateTask(tm[1], body) : await ROUTES[url.pathname](body);
       console.log(new Date().toISOString(), url.pathname, tm ? 'changed=' + out.changed.join(',') : JSON.stringify(out).slice(0, 200));
       return send(res, 200, out);
@@ -500,11 +531,12 @@ const server = http.createServer(async (req, res) => {
     console.error(new Date().toISOString(), url.pathname, e.message);
     return send(res, e.status || 500, { error: e.message });
   }
-});
+}
+
+if ((ON_RENDER || ON_VERCEL) && CFG.TODAY_STORE === 'file') console.error('WARNING: TODAY_STORE=file on an ephemeral disk; Today/Tomorrow will be lost on restart. Use asana_tags.');
 
 if (require.main === module) {
-  if (ON_RENDER && CFG.TODAY_STORE === 'file') console.error('WARNING: TODAY_STORE=file on an ephemeral disk; Today/Tomorrow will be lost on restart. Use asana_tags.');
   if (!process.env.ASANA_PAT) console.error('WARNING: ASANA_PAT is not set; /api/board will fail');
-  server.listen(CFG.PORT, CFG.HOST, () => console.log('day planner on', CFG.HOST + ':' + CFG.PORT, 'store=' + CFG.TODAY_STORE, CFG.READ_ONLY ? 'READ_ONLY' : ''));
+  http.createServer(handle).listen(CFG.PORT, CFG.HOST, () => console.log('day planner on', CFG.HOST + ':' + CFG.PORT, 'store=' + CFG.TODAY_STORE, CFG.READ_ONLY ? 'READ_ONLY' : ''));
 }
-module.exports = { createTask, getBoard, getTask, updateTask, movePlan, assignTask, CFG };
+module.exports = { createTask, getBoard, getTask, updateTask, movePlan, assignTask, handle, incomingUrl, CFG };

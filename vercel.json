@@ -1,0 +1,14 @@
+{
+  "regions": ["fra1"],
+  "rewrites": [
+    { "source": "/", "destination": "/api/page" },
+    { "source": "/index.html", "destination": "/api/page" },
+    { "source": "/healthz", "destination": "/api/healthz" }
+  ],
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 60,
+      "includeFiles": "public/**"
+    }
+  }
+}

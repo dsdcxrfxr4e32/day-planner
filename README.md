@@ -32,4 +32,4 @@ UI: clicking a card title/body opens an Asana-style edit pane (name, description
 ## Hosting on Render (stateless, 2026-10-28)
 - Everything required comes from env: `ASANA_PAT`, `ACCESS_KEY` (wins over `data/access_key`; required when `RENDER` is set, the server exits otherwise), `CAL_ICS_*` (wins over `data/cal.env`), `PORT`. Logs go to stdout/stderr.
 - Today, Tomorrow and Monday are the Asana due date (`TODAY_STORE=asana_tags`, the default). Moving to Today may add a `TODAY-<Name>` tag. Moving to Tomorrow or Monday only writes `due_on` and never creates a `TOMORROW-*` or `MONDAY-*` tag. `data/tag_gids.json` is only a cache (also kept in memory); `TODAY_STORE=file` is a box-only fallback and warns on Render.
-- Optional `DATA_DIR` moves the data folder. See `DEPLOY.md` and `render.yaml`.
+- Optional `DATA_DIR` moves the data folder. See `DEPLOY.md` and `render.yaml`. The same branch also deploys to Vercel (`vercel.json`, `api/[[...slug]].js`); dates stay on Europe/Athens, not the server timezone.

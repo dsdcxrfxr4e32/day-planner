@@ -25,6 +25,29 @@ Node version: `engines.node >=20` in package.json (Render picks it up; add `NODE
 4. Deploy. Check `https://<service>.onrender.com/healthz` → `{"ok":true}`, then open `https://<service>.onrender.com/?k=<ACCESS_KEY>`.
 5. Later calendar feeds: Render → service → Environment → add/edit `CAL_ICS_<NAME>` (or `CAL_ICS_<NAME>_<SUFFIX>`) → Save (redeploys).
 
+## Vercel (Pro, does not sleep the way the Render free plan does)
+
+Same `main` branch. Framework preset **Other** (not Next.js — `public/` must not be served as a static site; the function injects the build id into the HTML). Root directory: the repo root. Build command: none. Output directory: none. Install command: the default `npm install`. Node 20 or newer (`engines` in package.json). Region is `fra1` in `vercel.json` (Frankfurt); confirm that if the dashboard asks. Function timeout is 60s so a cold board load can finish.
+
+`vercel.json` sends `/`, `/index.html`, and `/healthz` through `api/[[...slug]].js`. `/api/*` hits that function directly. It calls the same handler as `node server.js`, so Render keeps working.
+
+Env vars to set on Vercel (names only; copy the values from Render). Do not commit them.
+
+| Name | Required |
+|---|---|
+| `ASANA_PAT` | yes |
+| `ACCESS_KEY` | yes (the function exits without it; use the same value so `?k=` links keep working) |
+| `CAL_ICS_DIMITRIS` | yes for Dimitris's calendar |
+| `CAL_ICS_DIMITRIS_PERSONAL` | optional second feed |
+| `CAL_ICS_ANTONIA` | optional |
+| `CAL_ICS_DIMITRA` | optional |
+
+Any further feed is `CAL_ICS_<NAME>` or `CAL_ICS_<NAME>_<SUFFIX>`. Leave a calendar var unset for "calendar not connected".
+
+Do not set `TODAY_STORE=file` (the disk is read-only; the default `asana_tags` is correct). Do not set `READ_ONLY` in production. Vercel sets `VERCEL` and `VERCEL_GIT_COMMIT_SHA` itself. In-memory caches (tag gids, calendars, project list) refill on a cold start; nothing is scheduled in the background. Dates use `Europe/Athens` explicitly, not the server timezone.
+
+After the first deploy: `https://<project>.vercel.app/healthz` → `{"ok":true}`, then `https://<project>.vercel.app/?k=<ACCESS_KEY>`.
+
 ## Free-plan behaviour
 - Sleeps after 15 min without traffic; the first request after that takes ~30-60 s (cold start). Nothing is lost: state is in Asana.
 - Disk is ephemeral: `data/` is recreated empty on each start; the tag-gid cache refills from Asana, calendars refetch (5 min cache).
