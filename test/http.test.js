@@ -43,10 +43,10 @@ async function call(method, url, headers) {
   a.equal(r.status, 403);
   r = await call('GET', '/?k=test-key');
   a.equal(r.status, 200);
-  a.ok(r.body.includes('Team day planner'));
+  a.ok(r.body.includes('Plano'));
   a.ok(!r.body.includes('__BUILD__'));
   r = await call('GET', '/api/page?k=test-key');
-  a.equal(r.status, 200); a.ok(r.body.includes('Team day planner'));
+  a.equal(r.status, 200); a.ok(r.body.includes('Plano'));
   r = await call('GET', '/api', { 'x-invoke-path': '/', 'x-invoke-query': 'k=test-key' });
   a.equal(r.status, 200);
   r = await call('GET', '/nope?k=test-key');
