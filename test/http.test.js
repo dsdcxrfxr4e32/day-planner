@@ -43,6 +43,10 @@ async function call(method, url, headers) {
   a.equal(r.status, 403);
   r = await call('GET', '/api/board');
   a.equal(r.status, 403);
+  r = await call('GET', '/api/task/123456789');
+  a.equal(r.status, 403);
+  r = await call('POST', '/api/task/123456789');
+  a.equal(r.status, 403);
   r = await call('GET', '/?k=test-key');
   a.equal(r.status, 200);
   a.ok(r.body.includes('Plano'));
