@@ -1,4 +1,5 @@
 {
+  "outputDirectory": "static",
   "regions": ["fra1"],
   "rewrites": [
     { "source": "/", "destination": "/api/page" },
