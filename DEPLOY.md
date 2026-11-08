@@ -46,7 +46,25 @@ Any further feed is `CAL_ICS_<NAME>` or `CAL_ICS_<NAME>_<SUFFIX>`. Leave a calen
 
 Do not set `TODAY_STORE=file` (the disk is read-only; the default `asana_tags` is correct). Do not set `READ_ONLY` in production. Vercel sets `VERCEL` and `VERCEL_GIT_COMMIT_SHA` itself. In-memory caches (tag gids, calendars, project list) refill on a cold start; nothing is scheduled in the background. Dates use `Europe/Athens` explicitly, not the server timezone.
 
-After the first deploy: `https://<project>.vercel.app/healthz` → `{"ok":true}`, then `https://<project>.vercel.app/?k=<ACCESS_KEY>`.
+After the first deploy, before Google login is turned on: `https://<project>.vercel.app/healthz` → `{"ok":true}`, then `https://<project>.vercel.app/?k=<ACCESS_KEY>`.
+
+## Google login (replaces `?k=` once it is on)
+
+Create the OAuth client in Google Cloud, then set the env vars. Until `GOOGLE_CLIENT_ID` is set, the shared `?k=` key keeps working, so production does not break during setup.
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/) with a Precise Greece account. Create a project, or pick one that already belongs to precisegreece.gr.
+2. APIs & Services → OAuth consent screen. If the Cloud project is inside the precisegreece.gr organisation, choose **Internal** so only that Workspace can sign in. Otherwise choose **External**, leave the app in Testing, and add `dm@precisegreece.gr`, `ak@precisegreece.gr`, `dd@precisegreece.gr`, and `dc@precisegreece.gr` as test users.
+3. APIs & Services → Credentials → Create credentials → **OAuth client ID**. Application type: **Web application**. Name it Plano.
+4. Authorized JavaScript origins: `https://precise-plano.vercel.app` (no path, no trailing slash). Leave Authorized redirect URIs empty. This login uses the Google button on the page, not a redirect.
+5. Create. Copy the **Client ID** (it ends in `.apps.googleusercontent.com`). The client secret is not used.
+6. On Vercel → the Plano project → Settings → Environment Variables, set for Production:
+   - `GOOGLE_CLIENT_ID` = that client id
+   - `SESSION_SECRET` = a long random string (for example 32+ bytes from a password generator). Do not commit it.
+   - `ALLOWED_EMAILS` is optional. If you leave it unset, the allowlist is `dm@precisegreece.gr`, `ak@precisegreece.gr`, `dd@precisegreece.gr`, `dc@precisegreece.gr`. Set it only to replace that list (comma-separated).
+7. Redeploy. Open `https://precise-plano.vercel.app/` with no key. You should see Plano and **Sign in with Google**. After a successful sign-in the address bar stays free of `?k=`. Any other Google account sees "This account isn't allowed".
+8. From then on, `?k=` and `ACCESS_KEY` do not open the app. `/healthz` stays public for uptime checks. To keep the old key on Render while Vercel uses Google, set `GOOGLE_CLIENT_ID` and `SESSION_SECRET` only on Vercel.
+
+`ACCESS_KEY` is still required on Render and on Vercel if `GOOGLE_CLIENT_ID` is not set.
 
 ## Free-plan behaviour
 - Sleeps after 15 min without traffic; the first request after that takes ~30-60 s (cold start). Nothing is lost: state is in Asana.

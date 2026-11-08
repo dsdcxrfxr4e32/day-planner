@@ -5,6 +5,8 @@ process.env.TODAY_STORE = 'asana_tags';
 delete process.env.VERCEL;
 delete process.env.RENDER;
 delete process.env.READ_ONLY;
+delete process.env.GOOGLE_CLIENT_ID;
+delete process.env.SESSION_SECRET;
 const a = require('assert');
 const { handle, incomingUrl } = require('../server');
 

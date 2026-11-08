@@ -11,6 +11,8 @@
 <meta name="robots" content="noindex">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta name="build" content="__BUILD__">
+<meta name="auth" content="__AUTH__">
+<meta name="user" content="__USER__">
 <title>Plano</title>
 <style>
 :root{--bg:#fff;--subtle:#f6f7f9;--elev:#fff;--bd:#e2e5e9;--bds:#eceef1;--focus:#3b6cf6;--t1:#111418;--t2:#4a5059;--t3:#8a9099;--ok:#1f9d55;--bad:#d93025;--warn:#b26a00;--acc:#eaf0ff;--fill:#eceef1;--r:8px}
@@ -223,7 +225,10 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
 <script>
 (function () {
   'use strict';
-  var KEY = new URLSearchParams(location.search).get('k') || '';
+  var AUTH = (document.querySelector('meta[name=auth]') || {}).content || 'key';
+  var USER = (document.querySelector('meta[name=user]') || {}).content || '';
+  var KEY = AUTH === 'google' ? '' : (new URLSearchParams(location.search).get('k') || '');
+  if (AUTH === 'google' && /[?&]k=/.test(location.search)) history.replaceState(null, '', location.pathname);
   var LINK = 'https://app.asana.com/1/1213289283868810/task/';
   var CLIENTS = { '054': 'ADA', '061': 'CHOROGRAPHERS', '072': 'MICROMEGA', '410': 'PILA STUDIO', '620': 'MAKRIDIS ASSOCIATES', '710': 'YPDS',
     '832': '3H', '902': '1Z', '904': 'ETSI', '906': 'STONES & WALLS', '907': 'CREATIVE ARCHITECTS', '909': 'POTIROPOULOS',
@@ -238,9 +243,12 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
   /* ---------- server ---------- */
   function api(method, path, body) {
     S.busy++; paintStatus();
-    return fetch(path + (path.indexOf('?') < 0 ? '?' : '&') + 'k=' + encodeURIComponent(KEY), {
-      method: method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined
+    var p = path;
+    if (KEY) p += (p.indexOf('?') < 0 ? '?' : '&') + 'k=' + encodeURIComponent(KEY);
+    return fetch(p, {
+      method: method, credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined
     }).then(function (r) {
+      if (r.status === 401) { location.href = '/'; return new Promise(function () {}); }
       return r.json().catch(function () { return { error: 'HTTP ' + r.status }; }).then(function (j) {
         if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
         return j;
@@ -609,7 +617,9 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     // Same remaining-work totals for Dimitris, Antonia, and Dimitra. Unassigned is not a lane or a load card.
     var people = S.board.people.filter(function (p) { return p.k !== 'un'; });
     var h = '<div class="top"><div><h1>Plano</h1><p class="summary">Every open Asana task per person, with minutes. Changes write straight to Asana.</p></div>';
-    h += '<div class="topr"><span class="status" id="status">' + statusHtml() + '</span><button class="btn bbig" data-act="refresh">↻ Refresh</button>' + toggle('showCal', 'Show calendar', S.showCal) + toggle('showDone', 'Show completed', S.showDone) + '</div></div>';
+    h += '<div class="topr"><span class="status" id="status">' + statusHtml() + '</span>';
+    if (USER) h += '<span class="small">' + esc(USER) + '</span><button class="btn bbig" data-act="logout">Sign out</button>';
+    h += '<button class="btn bbig" data-act="refresh">↻ Refresh</button>' + toggle('showCal', 'Show calendar', S.showCal) + toggle('showDone', 'Show completed', S.showDone) + '</div></div>';
 
     h += '<section><h2>Today\'s load</h2><p class="cap">Minutes still to do</p><div class="row">';
     people.forEach(function (p) {
@@ -821,6 +831,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
     else if (act === 'undo') undoLast();
     else if (act === 'clear') clearToday();
     else if (act === 'refresh') load(true);
+    else if (act === 'logout') fetch('/api/logout', { method: 'POST', credentials: 'same-origin' }).finally(function () { location.href = '/'; });
     else if (act === 'new') openNew(b);
     else if (act === 'mtab') { S.tab[b.getAttribute('data-k')] = b.getAttribute('data-kind'); render(); }
     else if (act === 'ftog') { S.fOpen = !S.fOpen; render(); }

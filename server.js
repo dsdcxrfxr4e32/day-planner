@@ -7,6 +7,7 @@ const path = require('path');
 const crypto = require('crypto');
 const L = require('./lib');
 const CAL = require('./cal');
+const AUTH = require('./auth');
 
 const DIR = __dirname;
 // data/ is optional (box: access_key, cal.env, tag cache). On hosts with an ephemeral disk (Render) everything
@@ -42,14 +43,17 @@ const CFG = {
   READ_ONLY: process.env.READ_ONLY === '1', // test mode: refuse any write to Asana
 };
 
-// Shared-link key: ?k=<key>. Env ACCESS_KEY wins; else data/access_key (generated once on the box).
-// On Render a generated key would change on every restart, so ACCESS_KEY is required there.
+// Shared-link key: ?k=<key>. Used only while GOOGLE_CLIENT_ID is unset.
+// Env ACCESS_KEY wins; else data/access_key (generated once on the box).
+// On Render or Vercel a generated key would change on every cold start, so ACCESS_KEY is required
+// until Google login is configured.
 const KEY_FILE = path.join(DATA, 'access_key');
 function loadAccessKey() {
   const env = String(process.env.ACCESS_KEY || '').trim();
   if (env) return env;
   try { const f = fs.readFileSync(KEY_FILE, 'utf8').trim(); if (f) return f; } catch { /* no file */ }
-  if (ON_RENDER || ON_VERCEL) { console.error('FATAL: ACCESS_KEY is not set (required on Render and Vercel)'); process.exit(1); }
+  if ((ON_RENDER || ON_VERCEL) && !String(process.env.GOOGLE_CLIENT_ID || '').trim()) { console.error('FATAL: ACCESS_KEY is not set (required on Render and Vercel until Google login is configured)'); process.exit(1); }
+  if (String(process.env.GOOGLE_CLIENT_ID || '').trim()) return '';
   const k = crypto.randomBytes(18).toString('base64url');
   try { fs.writeFileSync(KEY_FILE, k, { mode: 0o600 }); } catch (e) { console.error('access key not persisted:', e.message); }
   return k;
@@ -509,13 +513,53 @@ async function readBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
+function googleOn() { return !!String(process.env.GOOGLE_CLIENT_ID || '').trim(); }
+function sessionSecret() { return String(process.env.SESSION_SECRET || ''); }
+function allowList() { return AUTH.allowedEmails(process.env.ALLOWED_EMAILS); }
+function cookieSecure(req) { return hdr(req, 'x-forwarded-proto') === 'https' || ON_VERCEL || ON_RENDER; }
+function sessionEmail(req) {
+  return AUTH.readSession(AUTH.cookieFrom(hdr(req, 'cookie')), sessionSecret(), Date.now(), allowList());
+}
+function pageHtml(email) {
+  const user = email ? String(email).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) : '';
+  return fs.readFileSync(path.join(DIR, 'public', 'index.html'), 'utf8')
+    .replace(/__BUILD__/g, BUILD)
+    .replace(/__AUTH__/g, email ? 'google' : 'key')
+    .replace(/__USER__/g, user);
+}
+
 async function handle(req, res) {
   const url = new URL(incomingUrl(req), 'http://x');
   try {
     if (url.pathname === '/healthz') return send(res, 200, { ok: true });
-    if (!keyOk(req, url)) return send(res, 403, '<h1>403</h1><p>This link needs its access key.</p>', 'text/html; charset=utf-8', HTML_HEADERS);
+    if (googleOn()) {
+      if (req.method === 'POST' && url.pathname === '/api/session') {
+        if (!sessionSecret()) return send(res, 500, { error: 'SESSION_SECRET is not set' });
+        const body = await readBody(req);
+        const checked = await AUTH.verifyGoogleIdToken(body && body.credential, String(process.env.GOOGLE_CLIENT_ID).trim(), Date.now());
+        if (!checked.ok) return send(res, 400, { error: checked.error });
+        if (!AUTH.emailAllowed(checked.email, allowList())) return send(res, 403, { error: "This account isn't allowed" });
+        const token = AUTH.signSession(checked.email, sessionSecret(), Date.now());
+        return send(res, 200, { ok: true, email: checked.email }, 'application/json; charset=utf-8', { 'Set-Cookie': AUTH.cookieHeader(token, cookieSecure(req)) });
+      }
+      if (req.method === 'POST' && url.pathname === '/api/logout') {
+        return send(res, 200, { ok: true }, 'application/json; charset=utf-8', { 'Set-Cookie': AUTH.clearCookieHeader(cookieSecure(req)) });
+      }
+      const email = sessionEmail(req);
+      if (!email) {
+        if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
+          return send(res, 200, AUTH.loginPage(String(process.env.GOOGLE_CLIENT_ID).trim()), 'text/html; charset=utf-8', HTML_HEADERS);
+        }
+        return send(res, 401, { error: 'Sign in required' });
+      }
+      if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
+        return send(res, 200, pageHtml(email), 'text/html; charset=utf-8', HTML_HEADERS);
+      }
+    } else if (!keyOk(req, url)) {
+      return send(res, 403, '<h1>403</h1><p>This link needs its access key.</p>', 'text/html; charset=utf-8', HTML_HEADERS);
+    }
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-      return send(res, 200, fs.readFileSync(path.join(DIR, 'public', 'index.html'), 'utf8').replace(/__BUILD__/g, BUILD), 'text/html; charset=utf-8', HTML_HEADERS);
+      return send(res, 200, pageHtml(''), 'text/html; charset=utf-8', HTML_HEADERS);
     }
     if (req.method === 'GET' && url.pathname === '/api/board') return send(res, 200, { ...(await getBoard(url.searchParams.get('refresh') === '1')), build: BUILD });
     const tm = /^\/api\/task\/(\d{5,25})$/.exec(url.pathname);
