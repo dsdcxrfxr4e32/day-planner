@@ -24,13 +24,16 @@ a.equal(L.DEFAULT_MIN, 10); a.equal(L.minutesFromNotes(L.ensureDCode('plain')), 
 const cur = { name: '054a Review', notes: 'D10M\nbody', due_on: '2026-10-30' };
 a.deepEqual(L.buildTaskUpdate(cur, { name: '054a Review', notes: 'D10M\nbody', due_on: '2026-10-30' }), {});
 a.deepEqual(L.buildTaskUpdate(cur, { name: ' 054a Review v2 ' }), { name: '054a Review v2' });
-a.deepEqual(L.buildTaskUpdate(cur, { notes: 'body only' }), { notes: 'D10M\nbody only' });
-a.deepEqual(L.buildTaskUpdate(cur, { notes: 'D45M\nbody' }), { notes: 'D45M\nbody' });
+a.deepEqual(L.buildTaskUpdate(cur, { notes: 'body only' }), { html_notes: '<body>D10M\nbody only</body>' });
+a.deepEqual(L.buildTaskUpdate(cur, { notes: 'D45M\nbody' }), { html_notes: '<body>D45M\nbody</body>' });
+const greek = 'D1H\nΝα το δούμε πάλι αύριο με τον Δημήτρη.';
+a.deepEqual(L.buildTaskUpdate({ name: 'x', notes: 'D10M', html_notes: '<body>D10M</body>', due_on: null }, { notes: greek }), { html_notes: '<body>' + greek + '</body>' });
+a.deepEqual(L.buildTaskUpdate(cur, { notes: 'D1H\na & b <c>', due_on: '2026-11-18' }), { html_notes: '<body>D1H\na &amp; b &lt;c&gt;</body>', due_on: '2026-11-18' });
 a.deepEqual(L.buildTaskUpdate(cur, { due_on: '' }), { due_on: null });
 a.deepEqual(L.buildTaskUpdate({ name: 'x', notes: '', due_on: null }, { due_on: '' }), {});
 a.deepEqual(L.buildTaskUpdate({ name: 'x', notes: 'D30M\nplain', due_on: null }, { name: 'y' }), { name: 'y' }); // has a code: notes untouched
-a.deepEqual(L.buildTaskUpdate({ name: 'x', notes: 'plain', html_notes: '<body>plain</body>', due_on: null }, { name: 'y' }), { name: 'y', notes: 'D10M\nplain' }); // name save adds D10M
-a.deepEqual(L.buildTaskUpdate({ name: 'x', notes: '', html_notes: '<body></body>', due_on: null }, { name: 'y' }), { name: 'y', notes: 'D10M' });
+a.deepEqual(L.buildTaskUpdate({ name: 'x', notes: 'plain', html_notes: '<body>plain</body>', due_on: null }, { name: 'y' }), { name: 'y', html_notes: '<body>D10M\nplain</body>' }); // name save adds D10M
+a.deepEqual(L.buildTaskUpdate({ name: 'x', notes: '', html_notes: '<body></body>', due_on: null }, { name: 'y' }), { name: 'y', html_notes: '<body>D10M</body>' });
 a.deepEqual(L.buildTaskUpdate({ name: 'x', notes: 'bold', html_notes: '<body><strong>bold</strong></body>', due_on: null }, { name: 'y' }), { name: 'y', html_notes: '<body>D10M\n<strong>bold</strong></body>' }); // rich: keep formatting
 a.deepEqual(L.buildTaskUpdate({ name: 'x', notes: 'plain', due_on: null }, { name: 'x' }), {}); // nothing changed: nothing written
 a.deepEqual(L.buildTaskUpdate({ name: 'x', notes: 'plain', due_on: null }, { due_on: '2026-11-02' }), { due_on: '2026-11-02' }); // date-only: no code added

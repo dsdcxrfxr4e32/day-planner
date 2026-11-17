@@ -281,7 +281,8 @@ async function setMinutes({ i, m }) {
   if (!gidOk(i)) throw Object.assign(new Error('bad task id'), { status: 400 });
   const minutes = L.clampMinutes(m, CFG.CAP_MIN);
   const t = (await asana('GET', '/tasks/' + i + '?opt_fields=notes,html_notes')).data;
-  const body = L.isPlainHtml(t.notes, t.html_notes) ? { notes: L.rewritePlainNotes(t.notes, minutes) } : { html_notes: L.rewriteHtmlNotes(t.html_notes, minutes) };
+  const plain = L.isPlainHtml(t.notes, t.html_notes);
+  const body = plain ? { html_notes: L.plainToHtmlNotes(L.rewritePlainNotes(t.notes, minutes)) } : { html_notes: L.rewriteHtmlNotes(t.html_notes, minutes) };
   const d = (await asana('PUT', '/tasks/' + i + '?opt_fields=notes', { data: body })).data;
   return { i, m: L.minutesFromNotes(d.notes) };
 }
@@ -399,6 +400,7 @@ async function createTask(body) {
   const slot = body.slot || null;
   if (slot && !(SLOT[slot.s] && personByKey(slot.k))) throw Object.assign(new Error('bad slot'), { status: 400 });
   if (slot) data.due_on = slotDate(slot.s); // created in Today/Tomorrow/Monday: due that day
+  if (data.notes != null) { data.html_notes = L.plainToHtmlNotes(data.notes); delete data.notes; }
   data.projects = [String(body.project)];
   data.workspace = CFG.WORKSPACE;
   if (p.gid) data.assignee = p.gid;

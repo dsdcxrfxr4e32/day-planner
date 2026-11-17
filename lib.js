@@ -57,6 +57,16 @@ function unescapeHtml(s) {
   return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
 }
 
+// Asana's task pane renders html_notes. A write to plain notes is stored on the API object and
+// does not replace that description, so a multiline edit never shows up. Newlines stay as \n
+// inside <body> (Asana rejects <br>). Text is escaped so the body stays valid XML.
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function plainToHtmlNotes(notes) {
+  return '<body>' + escapeHtml(notes) + '</body>';
+}
+
 function isPlainHtml(notes, html) {
   const m = /^<body>([\s\S]*)<\/body>$/.exec(String(html || ''));
   if (!m) return !html;
@@ -119,7 +129,8 @@ const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 // that differ from `current` (the task as Asana has it now: name, notes, html_notes, due_on).
 // Saving a name or notes always leaves a D-code on the notes' first line: edited notes go through
 // ensureDCode; a name-only save of a task without a code also gets D10M (in html_notes when the
-// notes are rich text, so formatting is kept). A due-date-only save never touches the notes.
+// notes are rich text, so formatting is kept). The description is written as html_notes, never as
+// notes, so every line shows in Asana. A due-date-only save never touches the notes.
 // Throws on bad input.
 function buildTaskUpdate(current, edits) {
   const out = {};
@@ -131,9 +142,9 @@ function buildTaskUpdate(current, edits) {
   }
   if (edits.notes !== undefined) {
     const n = ensureDCode(edits.notes);
-    if (n !== normNotes(current.notes)) out.notes = n;
+    if (n !== normNotes(current.notes)) out.html_notes = plainToHtmlNotes(n);
   } else if (out.name !== undefined && minutesFromNotes(current.notes) === null) {
-    if (isPlainHtml(current.notes, current.html_notes)) out.notes = ensureDCode(current.notes);
+    if (isPlainHtml(current.notes, current.html_notes)) out.html_notes = plainToHtmlNotes(ensureDCode(current.notes));
     else out.html_notes = rewriteHtmlNotes(current.html_notes, DEFAULT_MIN);
   }
   if (edits.due_on !== undefined) {
@@ -175,4 +186,4 @@ function placeByDate({ lane, due, today }) {
 // Due date of an Asana task as an Athens day: due_at (a time) wins, else due_on.
 function dueDay(t) { return t.due_at ? athensDate(t.due_at) : t.due_on || ''; }
 
-module.exports = { DEFAULT_MIN, DEFAULT_DCODE, MIN_MIN, DEFAULT_CAP, dayCap, clampMinutes, placeByDate, dueDay, buildNewTask, ensureDCode, buildTaskUpdate, DCODE_RE, minutesFromNotes, formatDCode, rewritePlainNotes, rewriteHtmlNotes, isPlainHtml, athensDate, addDays, nextWorkday, nextMonday, boardDates, slotDue };
+module.exports = { DEFAULT_MIN, DEFAULT_DCODE, MIN_MIN, DEFAULT_CAP, dayCap, clampMinutes, placeByDate, dueDay, buildNewTask, ensureDCode, buildTaskUpdate, DCODE_RE, minutesFromNotes, formatDCode, rewritePlainNotes, rewriteHtmlNotes, plainToHtmlNotes, isPlainHtml, athensDate, addDays, nextWorkday, nextMonday, boardDates, slotDue };

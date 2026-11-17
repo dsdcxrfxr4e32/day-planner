@@ -118,6 +118,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
 .pane textarea.notes{width:100%;min-height:260px;font:14px/20px inherit;font-family:inherit;color:var(--t1);border:1px solid var(--bd);border-radius:8px;padding:8px 10px;resize:vertical}
 .pane .note{font-size:12px;color:var(--t3);margin-top:6px}
 .pane .perr{background:#fdecea;color:#8a1c12;border:1px solid #f5c2bd;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:12px}
+.pane .pok{background:#e7f6ec;color:#146c36;border:1px solid #b7e0c2;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:12px}
 .btnp{border:1px solid var(--focus);background:var(--focus);color:#fff;border-radius:8px;font:13px/20px inherit;font-family:inherit;padding:5px 14px;cursor:pointer}
 .btnp[disabled]{opacity:.6;cursor:default}
 .pane a.asana{font-size:12px;color:var(--t3);margin-left:auto}
@@ -272,7 +273,7 @@ h2{font-size:1.5rem;line-height:1.2;border:0;padding:0;margin:0 0 12px;color:#1e
 .over,.due{color:#1e1f21}
 .over{font-weight:600}
 .due{font-weight:500}
-.err,.pane .perr{background:#f3f3f4;color:#1e1f21;border:1px solid #e4e4e6}
+.err,.pane .perr,.pane .pok{background:#f3f3f4;color:#1e1f21;border:1px solid #e4e4e6}
 .spin{border-color:#5c5f64;border-top-color:transparent}
 .card .nm{padding-right:72px}
 .dup{position:absolute;top:8px;right:40px;width:24px;height:24px;padding:0;line-height:0;display:inline-flex;align-items:center;justify-content:center}
@@ -817,6 +818,7 @@ h2{font-size:1.5rem;line-height:1.2;border:0;padding:0;margin:0 0 12px;color:#1e
     var h = '<div class="mbg" data-mbg="1"><div class="pane" role="dialog" aria-modal="true" aria-label="Edit task">';
     h += '<div class="phd"><span class="small">' + (E.isNew ? 'New task' + (E.ctx.kind === 't' ? ' · Today' : E.ctx.kind === 'w' ? ' · ' + tomLbl() : E.ctx.kind === 'mo' ? ' · Monday' : '') : t && t.completed ? '✓ Completed task' : 'Task') + '</span><button class="btn bbig" data-ed="cancel" aria-label="Close">✕</button></div><div class="pbody">';
     if (E.err) h += '<div class="perr">' + esc(E.err) + '</div>';
+    else if (E.saved) h += '<div class="pok">Saved to Asana</div>';
     if (E.loading) h += '<div class="loading" style="padding:30px"><span class="spin"></span> Loading from Asana…</div>';
     else if (t) {
       h += '<textarea class="tname" rows="2" aria-label="Task name">' + esc(t.n) + '</textarea>';
@@ -834,8 +836,9 @@ h2{font-size:1.5rem;line-height:1.2;border:0;padding:0;margin:0 0 12px;color:#1e
     h += '<button class="btn bbig" data-ed="cancel"' + (E.saving ? ' disabled' : '') + '>Cancel</button>';
     if (!E.isNew) h += '<a class="asana" href="' + esc((t && t.link) || LINK + E.id) + '" target="_blank" rel="noreferrer">Open in Asana ↗</a>';
     h += '</div></div></div>';
-    // keep typed values across repaints (e.g. saving state / error)
-    var keep = E.data && modal.querySelector('.tname') ? readEditor() : null;
+    // keep typed values across repaints (assignee click, error). A fresh save shows the stored text.
+    var keep = E.fresh ? null : (E.data && modal.querySelector('.tname') ? readEditor() : null);
+    E.fresh = false;
     modal.innerHTML = h;
     if (keep) { modal.querySelector('.tname').value = keep.name; modal.querySelector('#ed-notes').value = keep.notes; modal.querySelector('#ed-due').value = keep.due_on; }
   }
@@ -860,13 +863,16 @@ h2{font-size:1.5rem;line-height:1.2;border:0;padding:0;margin:0 0 12px;color:#1e
     if (nm !== t.n) body.name = nm;
     if (v.notes.replace(/\r\n?/g, '\n') !== t.notes.replace(/\r\n?/g, '\n')) body.notes = v.notes;
     if (v.due_on !== t.d) body.due_on = v.due_on;
-    if (!Object.keys(body).length) return closeEditor();
-    E.saving = true; E.err = ''; paintEditor();
+    if (!Object.keys(body).length) { E.saved = true; E.err = ''; E.fresh = true; paintEditor(); return; }
+    E.saving = true; E.saved = false; E.err = ''; paintEditor();
     api('POST', '/api/task/' + E.id, body).then(function (r) {
+      if (!S.ed || S.ed !== E) return;
       var x = S.byId[r.i];
-      if (x) { var dc = x.d !== r.d; x.n = r.n; x.d = r.d; x.m = r.m; x.e = r.e; replace(x, dc); }
-      E.saving = false; S.ed = null; modal.innerHTML = ''; render();
-    }).catch(function (e) { E.saving = false; E.err = 'Not saved: ' + e.message; paintEditor(); });
+      if (x) { var dc = x.d !== r.d; x.n = r.n; x.d = r.d; x.m = r.m; x.e = r.e; replace(x, dc); render(); }
+      E.saving = false; E.saved = true; E.err = '';
+      E.data.n = r.n; E.data.notes = r.notes; E.data.d = r.d; E.data.m = r.m; E.data.e = r.e; E.data.rich = !!r.rich;
+      E.fresh = true; paintEditor();
+    }).catch(function (e) { if (!S.ed || S.ed !== E) return; E.saving = false; E.saved = false; E.err = 'Not saved: ' + e.message; paintEditor(); });
   }
   function saveNew(E, v, nm) {
     if (/^(\d{3}[a-z]?|PRE)$/i.test(nm)) { E.err = 'Type a task name after ' + nm + '.'; return paintEditor(); }
@@ -885,6 +891,7 @@ h2{font-size:1.5rem;line-height:1.2;border:0;padding:0;margin:0 0 12px;color:#1e
       return; }
     if (e.target.getAttribute('data-mbg')) closeEditor();
   });
+  modal.addEventListener('input', function () { if (S.ed && S.ed.saved) { S.ed.saved = false; var el = modal.querySelector('.pok'); if (el) el.remove(); } });
   modal.addEventListener('keydown', function (e) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveEditor(); }
     else if (e.key === 'Enter' && e.target.classList.contains('tname')) e.preventDefault();

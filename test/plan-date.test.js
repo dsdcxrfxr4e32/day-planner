@@ -110,6 +110,17 @@ function tagCalls() {
   a.ok(edited.changed.includes('due_on'));
   a.equal(puts().length, 1);
   a.equal(puts()[0].body.data.due_on, tomorrow);
+  a.equal(puts()[0].body.data.notes, undefined);
+  a.equal(puts()[0].body.data.html_notes, undefined);
+  a.deepEqual(tagCalls(), []);
+
+  calls.length = 0;
+  const greek = 'D1H\nΝα το δούμε πάλι αύριο με τον Δημήτρη.';
+  const described = await S.updateTask(TASK, { notes: greek });
+  a.deepEqual(described.changed, ['html_notes']);
+  a.equal(puts().length, 1);
+  a.equal(puts()[0].body.data.html_notes, '<body>' + greek + '</body>');
+  a.equal(puts()[0].body.data.notes, undefined);
   a.deepEqual(tagCalls(), []);
 
   calls.length = 0;
@@ -134,6 +145,8 @@ function tagCalls() {
   const created = calls.filter((c) => c.method === 'POST' && c.path.startsWith('/tasks'));
   a.equal(created.length, 1);
   a.equal(created[0].body.data.due_on, today);
+  a.equal(created[0].body.data.html_notes, '<body>D10M</body>');
+  a.equal(created[0].body.data.notes, undefined);
   a.deepEqual(tagCalls(), []);
 
   a.equal(L.slotDue('w', '2026-11-06'), '2026-11-07');
