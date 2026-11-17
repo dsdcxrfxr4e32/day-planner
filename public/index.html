@@ -238,7 +238,10 @@ h2{font-size:1.5rem;line-height:1.2;border:0;padding:0;margin:0 0 12px;color:#1e
 .colsub{font:500 .875rem/1.25rem "IBM Plex Sans",sans-serif;letter-spacing:0;text-transform:none;color:#5c5f64}
 .grphd .lbl{font:500 1.75rem/1.2 "IBM Plex Sans",sans-serif;letter-spacing:0;text-transform:none;color:#5c5f64;min-width:0;flex:1 1 8rem;overflow-wrap:anywhere}
 .grphd .small{flex:none;align-self:center}
-.grphd .addb{vertical-align:middle;flex:none}
+.grphd .addb{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;margin:0 0 0 8px;padding:0;border:0;border-radius:50%;background:#1e1f21;color:#fff;vertical-align:middle;flex:none;line-height:0;cursor:pointer}
+.grphd .addb svg{display:block;width:14px;height:14px}
+.grphd .addb:hover{background:#3a3b3e;border-color:transparent;color:#fff}
+.grphd .addb:focus-visible{outline:none;border-color:transparent;box-shadow:0 0 0 3px #fff,0 0 0 5px #1e1f21}
 .card,.load,.col,.pane,.toast,.mlist{background:#ffffff;border:1px solid rgb(30 31 33 / 10%);border-radius:.525rem;box-shadow:none}
 .col{background:#ffffff}
 .col.hot{background:#f3f3f4;border:1px dashed #1e1f21}
@@ -627,7 +630,7 @@ h2{font-size:1.5rem;line-height:1.2;border:0;padding:0;margin:0 0 12px;color:#1e
       var own = grp.xs.filter(function (x) { return x.a === k; }), un = grp.xs.filter(function (x) { return x.a !== k; });
       var sp = sectionProject(grp);
       var add = sp ? ' <button class="addb" data-act="new" data-k="' + k + '" data-kind="' + kind + '" data-pg="' + esc(sp.g) + '" data-pn="' + esc(sp.n) + '" data-pre="' + esc(sp.pre) +
-        '" title="New task in ' + esc(sp.n) + '" aria-label="New task in ' + esc(sp.n) + '">+</button>' : '';
+        '" title="New task in ' + esc(sp.n) + '" aria-label="New task in ' + esc(sp.n) + '"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 2.6v10.8M2.6 8h10.8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>' : '';
       h += '<div class="grp"><div class="grphd"><span class="lbl">' + esc(grp.g.label) + add + '</span><span class="small">' + own.length + ' · ' + hm(sum(own)) +
         (un.length ? '<span style="opacity:.8">  + ' + un.length + ' unassigned · ' + hm(sum(un)) + '</span>' : '') + '</span></div>';
       if (kind === 'a') { // All: sub-headed by the column each task is in; buttons as in that column
