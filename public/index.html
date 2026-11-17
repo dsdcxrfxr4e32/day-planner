@@ -466,7 +466,7 @@ h2{font-size:1.5rem;line-height:1.2;border:0;padding:0;margin:0 0 12px;color:#1e
     }, 700);
   }
   // slot: 't' Today, 'w' Tomorrow, 'mo' Monday, or '' Backlog. A task sits in at most one of them.
-  // The column is the Asana due date (src 'd'). A leftover plan tag does not keep a card where it is.
+  // The column is the Asana due date (src 'd').
   // force: the due date was just edited; place by that date.
   function replace(x, force) {
     if (!x || (!force && x.src !== 'd' && (x.t || x.w || x.mo))) return;
@@ -518,7 +518,7 @@ h2{font-size:1.5rem;line-height:1.2;border:0;padding:0;margin:0 0 12px;color:#1e
     if (!list.length) return;
     if (!confirm('Clear Today for ' + (S.who === 'all' ? 'everyone' : nameOf(S.who)) + ' (' + list.length + ' tasks)?')) return;
     var entries = list.map(function (x) { return { i: x.i, t: x.t }; });
-    list.forEach(function (x) { x.t = ''; }); render();
+    list.forEach(function (x) { x.t = ''; x.d = ''; x.src = ''; }); render();
     api('POST', '/api/clear-today', { entries: entries }).then(function (r) {
       if (r.failed && r.failed.length) showErr(r.failed.length + ' tasks could not be cleared; Refresh to see them.');
     }).catch(function (e) { showErr('Clear failed: ' + e.message + ' — Refresh to see the real state.'); });
@@ -876,7 +876,6 @@ h2{font-size:1.5rem;line-height:1.2;border:0;padding:0;margin:0 0 12px;color:#1e
     api('POST', '/api/task', body).then(function (x) {
       E.saving = false; S.ed = null; modal.innerHTML = '';
       S.board.tasks.push(x); S.byId[x.i] = x; render();
-      if (!x.tagged) showErr('Task created, but it could not be added to ' + (c.kind === 't' ? 'Today' : c.kind === 'mo' ? 'Monday' : tomLbl()) + '; it is in the Backlog.');
     }).catch(function (e) { E.saving = false; E.err = 'Not created: ' + e.message; paintEditor(); });
   }
   modal.addEventListener('click', function (e) {

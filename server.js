@@ -11,7 +11,7 @@ const AUTH = require('./auth');
 const DUP = require('./duplicate');
 
 const DIR = __dirname;
-// data/ is optional (box: access_key, cal.env, tag cache). On hosts with an ephemeral disk (Render) everything
+// data/ is optional (box: access_key, cal.env). On hosts with an ephemeral disk (Render) everything
 // required comes from env; files there are only a fallback or a cache.
 const DATA = process.env.DATA_DIR || path.join(DIR, 'data');
 const ON_RENDER = !!process.env.RENDER; // Render sets RENDER=true in every service
@@ -34,13 +34,10 @@ const CFG = {
   EXCLUDE_UNASSIGNED_PROJECTS: ['012a AMK', 'Private Dimitris', 'Precise Private'],
   PRIVATE_PROJECT_RE: /private/i,
   PRIVATE_OWNER: 'dm',
-  // 'asana_tags': moving a task to Today adds the tag TODAY-<Name>. Tomorrow and Monday are due
-  // dates only — TOMORROW_PREFIX is kept so a move can remove a leftover TOMORROW-<Name>, never to create one.
-  // 'file': data/today.json, data/tomorrow.json, data/monday.json on the box.
+  // Columns are the Asana due date only (Europe/Athens). This server never creates, adds, or removes a tag.
+  // 'file': data/today.json, data/tomorrow.json and data/monday.json on the box. The board does not read them.
   TODAY_STORE: process.env.TODAY_STORE || 'asana_tags',
-  TAG_PREFIX: 'TODAY-',
-  TOMORROW_PREFIX: 'TOMORROW-',
-  TASK_FIELDS: 'name,assignee,completed,completed_at,created_at,due_on,due_at,notes,projects.name,projects.archived,parent.name,tags.name,memberships.section.name',
+  TASK_FIELDS: 'name,assignee,completed,completed_at,created_at,due_on,due_at,notes,projects.name,projects.archived,parent.name,memberships.section.name',
   READ_ONLY: process.env.READ_ONLY === '1', // test mode: refuse any write to Asana
 };
 
@@ -137,34 +134,17 @@ function sectionProjects() {
 
 /* ---------- Today store ---------- */
 const TODAY_FILE = path.join(DATA, 'today.json');
-const TAGS_FILE = path.join(DATA, 'tag_gids.json');
 const TOMORROW_FILE = path.join(DATA, 'tomorrow.json');
 const MONDAY_FILE = path.join(DATA, 'monday.json');
-// Tomorrow and Monday are due dates, not tags. `prefix` is only for the Today tag (and for
-// recognising a leftover TOMORROW-<Name> so a move can remove it). Never create those tags.
+// Local slot files for TODAY_STORE=file. Asana mode does not use them, and neither mode uses tags.
 const SLOT = {
-  t: { prefix: () => CFG.TAG_PREFIX, file: TODAY_FILE },
-  w: { prefix: () => CFG.TOMORROW_PREFIX, file: TOMORROW_FILE },
-  mo: { prefix: () => null, file: MONDAY_FILE },
+  t: { file: TODAY_FILE },
+  w: { file: TOMORROW_FILE },
+  mo: { file: MONDAY_FILE },
 };
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return {}; } };
 const writeJson = (f, v) => { const tmp = f + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(v, null, 1)); fs.renameSync(tmp, f); };
 const personByKey = (k) => CFG.PEOPLE.find((p) => p.k === k);
-
-const tagMem = {}; // tag name -> gid; data/tag_gids.json is just a cache, Asana is the source of truth
-async function todayTagGid(k, create, prefix) {
-  const p = personByKey(k);
-  if (!p) throw Object.assign(new Error('Unknown person ' + k), { status: 400 });
-  const name = (prefix || CFG.TAG_PREFIX) + p.name;
-  if (tagMem[name]) return tagMem[name];
-  const cache = readJson(TAGS_FILE);
-  if (cache[name]) return (tagMem[name] = cache[name]);
-  const tags = await listAll('/workspaces/' + CFG.WORKSPACE + '/tags?opt_fields=name');
-  let gid = (tags.find((t) => t.name === name) || {}).gid;
-  if (!gid && create) gid = (await asana('POST', '/tags', { data: { name, workspace: CFG.WORKSPACE, color: 'light-green' } })).data.gid;
-  if (gid) { tagMem[name] = gid; cache[name] = gid; try { writeJson(TAGS_FILE, cache); } catch { /* cache only */ } }
-  return gid || null;
-}
 
 /* ---------- calendars (client meetings) ---------- */
 // Secret iCal URLs: env CAL_ICS_<NAME> (e.g. CAL_ICS_DIMITRIS), or the same KEY=VALUE lines in data/cal.env
@@ -281,7 +261,7 @@ async function getBoard(force) {
     const c = t.completed ? L.athensDate(t.completed_at) : '';
     if (t.completed && c < oldest) return;
     const m = L.minutesFromNotes(t.notes);
-    // Columns follow the due date. TODAY-/TOMORROW- tags are not read: a leftover tag cannot move a card.
+    // The column is the due date alone. Tags are not read and are not written.
     const d = L.dueDay(t), pl = L.placeByDate({ lane: a, due: d, today });
     seen.add(t.gid);
     tasks.push({ i: t.gid, a, n: t.name || '', p: projects.join(', '), pg: activeProjs[0] ? activeProjs[0].gid : '', par: t.parent ? t.parent.name : '', d, m: m === null ? L.DEFAULT_MIN : m, e: m === null ? 0 : 1, c, t: pl.t, w: pl.w, mo: pl.mo, ...(pl.src ? { src: pl.src } : {}) });
@@ -325,89 +305,60 @@ async function getTask(i) {
   return taskView((await asana('GET', '/tasks/' + i + '?opt_fields=' + EDIT_FIELDS)).data);
 }
 // Body: any of {name, notes, due_on}. Only fields that differ from Asana's current value are sent.
+// A new due date is stored as due_on. Existing tags are left as they are.
 async function updateTask(i, edits) {
   if (!gidOk(i)) throw Object.assign(new Error('bad task id'), { status: 400 });
-  const cur = (await asana('GET', '/tasks/' + i + '?opt_fields=name,notes,html_notes,due_on,tags.name')).data;
+  const cur = (await asana('GET', '/tasks/' + i + '?opt_fields=name,notes,html_notes,due_on')).data;
   const body = L.buildTaskUpdate(cur, edits);
   if (!Object.keys(body).length) return { ...(await getTask(i)), changed: [] };
   const t = (await asana('PUT', '/tasks/' + i + '?opt_fields=' + EDIT_FIELDS, { data: body })).data;
-  if ('due_on' in body) await clearPlan(i, cur.tags || []);
+  if ('due_on' in body) await clearPlanFiles(i);
   return { ...taskView(t), changed: Object.keys(body) };
 }
 
 let fileLock = Promise.resolve();
 const withPlan = (fn) => (fileLock = fileLock.then(() => { const p = readJson(TODAY_FILE); fn(p); writeJson(TODAY_FILE, p); }));
 
-async function setToday({ i, t, prev }) {
+// Due date of a column (Europe/Athens): Today -> today, Tomorrow -> the next calendar day, Monday -> the next Monday.
+function slotDate(s) { return L.slotDue(s, L.athensDate(new Date())); }
+
+// Box fallback only. Writes the local slot files and never calls Asana.
+async function writeSlots(i, to) {
+  for (const s of Object.keys(SLOT)) {
+    const f = SLOT[s].file;
+    await (fileLock = fileLock.then(() => { const p = readJson(f); if (to && to.s === s) p[i] = to.k; else delete p[i]; writeJson(f, p); }));
+  }
+}
+async function clearPlanFiles(i) {
+  if (CFG.TODAY_STORE !== 'file') return;
+  for (const s of Object.keys(SLOT)) { const f = SLOT[s].file; await (fileLock = fileLock.then(() => { const p = readJson(f); if (p[i]) { delete p[i]; writeJson(f, p); } })); }
+}
+function dueWrite(s) { return s ? { due_on: slotDate(s) } : { due_on: null, due_at: null }; }
+
+async function setToday({ i, t }) {
   if (!gidOk(i)) throw Object.assign(new Error('bad task id'), { status: 400 });
   if (t && !personByKey(t)) throw Object.assign(new Error('bad person'), { status: 400 });
   if (CFG.TODAY_STORE === 'file') { await withPlan((p) => { if (t) p[i] = t; else delete p[i]; }); return { i, t: t || '' }; }
-  if (prev && prev !== t) {
-    const old = await todayTagGid(prev, false);
-    if (old) await asana('POST', '/tasks/' + i + '/removeTag', { data: { tag: old } });
-  }
-  if (t) await asana('POST', '/tasks/' + i + '/addTag', { data: { tag: await todayTagGid(t, true) } });
-  return { i, t: t || '' };
-}
-
-// A due-date edit drops Today/Tomorrow plan tags so the date alone decides the column
-// (today -> Today, next calendar day -> Tomorrow, next Monday -> Monday, else Backlog).
-async function clearPlan(i, tags) {
-  if (CFG.TODAY_STORE === 'file') {
-    for (const s of Object.keys(SLOT)) { const f = SLOT[s].file; await (fileLock = fileLock.then(() => { const p = readJson(f); if (p[i]) { delete p[i]; writeJson(f, p); } })); }
-    return;
-  }
-  const pfx = [CFG.TAG_PREFIX, CFG.TOMORROW_PREFIX];
-  for (const tg of tags || []) if (pfx.some((x) => x && (tg.name || '').startsWith(x)) && CFG.PEOPLE.some((p) => pfx.some((x) => tg.name === x + p.name)))
-    await asana('POST', '/tasks/' + i + '/removeTag', { data: { tag: tg.gid } });
-}
-
-// Remove TODAY-<Name> and TOMORROW-<Name> from this one task. Does not delete the tag
-// itself and does not scan the workspace. Never creates a tag.
-async function stripPlanTags(i) {
-  if (CFG.TODAY_STORE === 'file') return;
-  const tags = ((await asana('GET', '/tasks/' + i + '?opt_fields=tags.name')).data || {}).tags || [];
-  await clearPlan(i, tags);
+  const d = (await asana('PUT', '/tasks/' + i + '?opt_fields=due_on,due_at', { data: dueWrite(t ? 't' : '') })).data;
+  return { i, t: t || '', d: d.due_on || '' };
 }
 
 // Move a task between Backlog / Today / Tomorrow / Monday. from/to: {s:'t'|'w'|'mo', k} or null (Backlog).
-// Due date (Europe/Athens): Today -> today, Tomorrow -> the next calendar day, Monday -> the next Monday.
-function slotDate(s) { return L.slotDue(s, L.athensDate(new Date())); }
-// A move also sets the due date in the same call: into a column = that day (date only, replaces any
-// due time); back to Backlog = no due date. Re-dropping in the same slot changes nothing.
-// Tomorrow and Monday never add a tag. Any TODAY-/TOMORROW- plan tags already on the task are removed
-// so they cannot outvote the date. Today still adds TODAY-<Name> (its existing tag).
+// The only Asana write is due_on (date only, so a due time is replaced; Backlog clears due_on and due_at).
+// Re-dropping in the same slot changes nothing. Tags are not created, added, or removed.
 async function movePlan({ i, from, to }) {
-  const out = await movePlanTags({ i, from, to });
-  const same = from && to && from.s === to.s && from.k === to.k;
-  if (same || (!from && !to)) return out;
-  const data = to ? { due_on: slotDate(to.s) } : { due_on: null, due_at: null };
-  const t = (await asana('PUT', '/tasks/' + i + '?opt_fields=due_on,due_at', { data })).data;
-  out.d = t.due_on || '';
-  return out;
-}
-async function movePlanTags({ i, from, to }) {
   if (!gidOk(i)) throw Object.assign(new Error('bad task id'), { status: 400 });
   const ok = (x) => !x || (SLOT[x.s] && personByKey(x.k));
   if (!ok(from) || !ok(to)) throw Object.assign(new Error('bad slot'), { status: 400 });
   const same = from && to && from.s === to.s && from.k === to.k;
-  if (CFG.TODAY_STORE === 'file') {
-    for (const s of Object.keys(SLOT)) {
-      const f = SLOT[s].file;
-      await (fileLock = fileLock.then(() => { const p = readJson(f); if (to && to.s === s) p[i] = to.k; else delete p[i]; writeJson(f, p); }));
-    }
-    return { i, to: to || null };
-  }
-  if (same) return { i, to: to || null };
-  await stripPlanTags(i);
-  // Only Today keeps a plan tag. Tomorrow and Monday are the due date alone — do not add TOMORROW-* or MONDAY-*.
-  if (to && to.s === 't') await asana('POST', '/tasks/' + i + '/addTag', { data: { tag: await todayTagGid(to.k, true, CFG.TAG_PREFIX) } });
-  return { i, to: to || null };
+  if (CFG.TODAY_STORE === 'file') await writeSlots(i, to);
+  if (same || (!from && !to)) return { i, to: to || null };
+  const d = (await asana('PUT', '/tasks/' + i + '?opt_fields=due_on,due_at', { data: dueWrite(to && to.s) })).data;
+  return { i, to: to || null, d: d.due_on || '' };
 }
 
 // Reassign: a = person key ('un' = unassign). The card stays in its column because the due date
-// did not change. A Today tag, if the task is in Today, moves to the new person. Tomorrow and
-// Monday never gain a tag (that would recreate TOMORROW-<Name>).
+// did not change. No tag is added or removed.
 async function assignTask({ i, a, from }) {
   if (!gidOk(i)) throw Object.assign(new Error('bad task id'), { status: 400 });
   const p = personByKey(a);
@@ -416,12 +367,13 @@ async function assignTask({ i, a, from }) {
   const d = (await asana('PUT', '/tasks/' + i + '?opt_fields=assignee.name', { data: { assignee: p.gid } })).data;
   let moved = null;
   if (from && from.k !== a) {
-    if (from.s === 't') await movePlanTags({ i, from, to: { s: 't', k: a } });
+    if (CFG.TODAY_STORE === 'file') await writeSlots(i, { s: from.s, k: a });
     moved = { s: from.s, k: a };
   }
   return { i, a, assignee: d.assignee ? d.assignee.name : '', slot: moved || from || null };
 }
 
+// Take the listed tasks out of Today by clearing their due date. Does not touch tags.
 async function clearToday({ entries }) {
   entries = (entries || []).filter((e) => gidOk(e.i) && personByKey(e.t));
   if (CFG.TODAY_STORE === 'file') { await withPlan((p) => entries.forEach((e) => delete p[e.i])); return { cleared: entries.length, failed: [] }; }
@@ -429,7 +381,7 @@ async function clearToday({ entries }) {
   let cleared = 0;
   for (let j = 0; j < entries.length; j += 10) {
     await Promise.all(entries.slice(j, j + 10).map(async (e) => {
-      try { const tag = await todayTagGid(e.t, false); if (tag) await asana('POST', '/tasks/' + e.i + '/removeTag', { data: { tag } }); cleared++; }
+      try { await asana('PUT', '/tasks/' + e.i + '?opt_fields=due_on,due_at', { data: { due_on: null, due_at: null } }); cleared++; }
       catch { failed.push(e.i); }
     }));
   }
@@ -451,16 +403,11 @@ async function createTask(body) {
   data.workspace = CFG.WORKSPACE;
   if (p.gid) data.assignee = p.gid;
   const t = (await asana('POST', '/tasks?opt_fields=' + CFG.TASK_FIELDS, { data })).data;
-  let planned = null;
-  if (slot && slot.s === 't') {
-    try { await movePlanTags({ i: t.gid, from: null, to: slot }); planned = slot; }
-    catch (e) { console.error(new Date().toISOString(), 'create: tag failed', e.message); }
-  } else if (slot) planned = slot; // Tomorrow/Monday: the due date places the card; no plan tag
+  if (slot && CFG.TODAY_STORE === 'file') await writeSlots(t.gid, slot);
   const m = L.minutesFromNotes(t.notes);
   return {
     i: t.gid, a, n: t.name || '', p: (t.projects || []).map((x) => x.name).join(', '), pg: String(body.project), par: '', d: t.due_on || '',
-    m: m === null ? L.DEFAULT_MIN : m, e: m === null ? 0 : 1, c: '', t: planned && planned.s === 't' ? planned.k : '', w: planned && planned.s === 'w' ? planned.k : '', mo: planned && planned.s === 'mo' ? planned.k : '',
-    tagged: !slot || !!planned,
+    m: m === null ? L.DEFAULT_MIN : m, e: m === null ? 0 : 1, c: '', t: slot && slot.s === 't' ? slot.k : '', w: slot && slot.s === 'w' ? slot.k : '', mo: slot && slot.s === 'mo' ? slot.k : '',
   };
 }
 
@@ -590,4 +537,4 @@ if (require.main === module) {
   if (!process.env.ASANA_PAT) console.error('WARNING: ASANA_PAT is not set; /api/board will fail');
   http.createServer(handle).listen(CFG.PORT, CFG.HOST, () => console.log('day planner on', CFG.HOST + ':' + CFG.PORT, 'store=' + CFG.TODAY_STORE, CFG.READ_ONLY ? 'READ_ONLY' : ''));
 }
-module.exports = { createTask, getBoard, getTask, updateTask, movePlan, assignTask, handle, incomingUrl, CFG };
+module.exports = { createTask, getBoard, getTask, updateTask, movePlan, assignTask, setToday, clearToday, handle, incomingUrl, CFG };

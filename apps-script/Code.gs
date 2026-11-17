@@ -22,11 +22,10 @@ var CFG = {
   // Tasks in a project matching this are shown only when assigned to Dimitris.
   PRIVATE_PROJECT_RE: /private/i,
   PRIVATE_OWNER: 'dm',
-  // Where the planned "Today" state lives: 'asana_tags' (tags TODAY-<Name> on the task)
-  // or 'properties' (Script Properties JSON, shared by everyone using this deployment).
+  // Where the planned "Today" state lives when not using the due date: 'properties'
+  // (Script Properties JSON). The default follows the Asana due date and never touches a tag.
   TODAY_STORE: 'asana_tags',
-  TAG_PREFIX: 'TODAY-',
-  TASK_FIELDS: 'name,assignee,completed,completed_at,created_at,due_on,notes,projects.name,parent.name,tags.name'
+  TASK_FIELDS: 'name,assignee,completed,completed_at,created_at,due_on,notes,projects.name,parent.name'
 };
 
 var DCODE_RE = /^\s*D\s?(?:(\d+(?:[.,]\d+)?)\s*H)?\s*(?:(\d+)\s*M)?(?![A-Za-z0-9])/i;
@@ -224,39 +223,6 @@ function isPlainHtml_(notes, html) {
 
 /* ------------------------------------------------------------------ Today state */
 
-function tagKeyByName_() {
-  var m = {};
-  CFG.PEOPLE.forEach(function (p) { m[CFG.TAG_PREFIX + p.name] = p.k; });
-  return m;
-}
-
-function personByKey_(k) {
-  for (var i = 0; i < CFG.PEOPLE.length; i++) if (CFG.PEOPLE[i].k === k) return CFG.PEOPLE[i];
-  return null;
-}
-
-/** gid of tag TODAY-<Name>; looked up once, created on first use, cached in Script Properties. */
-function todayTagGid_(k, create) {
-  var p = personByKey_(k);
-  if (!p) throw new Error('Unknown person ' + k);
-  var name = CFG.TAG_PREFIX + p.name;
-  var props = PropertiesService.getScriptProperties();
-  var cached = props.getProperty('TAG_GID_' + name);
-  if (cached) return cached;
-  var offset = null, found = null;
-  for (var i = 0; i < 30 && !found; i++) {
-    var d = call_('get', '/workspaces/' + CFG.WORKSPACE + '/tags?' + qs_({ limit: 100, opt_fields: 'name', offset: offset }));
-    (d.data || []).forEach(function (t) { if (t.name === name) found = t.gid; });
-    if (!d.next_page || !d.next_page.offset) break;
-    offset = d.next_page.offset;
-  }
-  if (!found && create) {
-    found = call_('post', '/tags', { data: { name: name, workspace: CFG.WORKSPACE, color: 'light-green' } }).data.gid;
-  }
-  if (found) props.setProperty('TAG_GID_' + name, found);
-  return found;
-}
-
 function readTodayProps_() {
   try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('TODAY_PLAN') || '{}'); }
   catch (e) { return {}; }
@@ -290,7 +256,6 @@ function getBoard() {
 
   var keyByGid = {};
   CFG.PEOPLE.forEach(function (p) { if (p.gid) keyByGid[p.gid] = p.k; });
-  var tagKey = tagKeyByName_();
   var plan = CFG.TODAY_STORE === 'properties' ? readTodayProps_() : null;
   var oldest = addDays_(today, -CFG.DONE_DAYS);
   var seen = {}, tasks = [];
@@ -309,7 +274,7 @@ function getBoard() {
       var m = minutesFromNotes(t.notes);
       var owner = '';
       if (plan) owner = plan[t.gid] || '';
-      else (t.tags || []).forEach(function (tg) { if (tagKey[tg.name]) owner = owner || tagKey[tg.name]; });
+      else if ((t.due_on || '') === today) owner = a;
       if (owner && a !== 'un' && owner !== a) owner = a; // assigned tasks only plan into their own lane
       seen[t.gid] = true;
       tasks.push({
@@ -344,33 +309,27 @@ function setMinutes(gid, minutes) {
   return { i: gid, m: minutesFromNotes(d.notes) };
 }
 
-/** Plan a task into a person's Today (owner = lane key) or back to Backlog (owner = ''). */
-function setToday(gid, owner, prevOwner) {
+/** Plan a task into Today by setting due_on, or back to Backlog by clearing it. Never touches a tag. */
+function setToday(gid, owner) {
   if (CFG.TODAY_STORE === 'properties') {
     writeTodayProps_(function (plan) { if (owner) plan[gid] = owner; else delete plan[gid]; });
     return { i: gid, t: owner || '' };
   }
-  if (prevOwner && prevOwner !== owner) {
-    var oldTag = todayTagGid_(prevOwner, false);
-    if (oldTag) call_('post', '/tasks/' + encodeURIComponent(gid) + '/removeTag', { data: { tag: oldTag } });
-  }
-  if (owner) call_('post', '/tasks/' + encodeURIComponent(gid) + '/addTag', { data: { tag: todayTagGid_(owner, true) } });
-  return { i: gid, t: owner || '' };
+  var data = owner ? { due_on: todayStr_() } : { due_on: null, due_at: null };
+  var d = call_('put', '/tasks/' + encodeURIComponent(gid) + '?opt_fields=due_on,due_at', { data: data }).data;
+  return { i: gid, t: owner || '', d: d.due_on || '' };
 }
 
-/** Clear Today for a list of {i, t} entries. */
+/** Clear Today for a list of {i, t} entries by clearing each due date. Does not touch tags. */
 function clearToday(entries) {
   entries = entries || [];
   if (CFG.TODAY_STORE === 'properties') {
     writeTodayProps_(function (plan) { entries.forEach(function (e) { delete plan[e.i]; }); });
     return { cleared: entries.length, failed: [] };
   }
-  var tagOf = {};
   var reqs = [], ids = [];
   entries.forEach(function (e) {
-    if (!(e.t in tagOf)) tagOf[e.t] = todayTagGid_(e.t, false);
-    if (!tagOf[e.t]) return;
-    reqs.push(['post', '/tasks/' + encodeURIComponent(e.i) + '/removeTag', { data: { tag: tagOf[e.t] } }]);
+    reqs.push(['put', '/tasks/' + encodeURIComponent(e.i) + '?opt_fields=due_on,due_at', { data: { due_on: null, due_at: null } }]);
     ids.push(e.i);
   });
   var failed = [];

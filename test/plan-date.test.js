@@ -1,4 +1,4 @@
-// Asana-tag store: Tomorrow and Monday write a due date and never create a plan tag.
+// Column moves write an Asana due date and never create, add, or remove a tag.
 // Fetch is mocked; nothing here talks to Asana.
 process.env.TODAY_STORE = 'asana_tags';
 process.env.ASANA_PAT = 'test-pat';
@@ -21,17 +21,30 @@ global.fetch = async (url, opts) => {
   calls.push({ method, path, body });
   if (method === 'POST' && /\/tags$/.test(path)) throw new Error('created a tag ' + JSON.stringify(body));
   if (method === 'POST' && path.includes('addTag')) throw new Error('addTag ' + path + ' ' + JSON.stringify(body));
+  if (method === 'POST' && path.includes('removeTag')) throw new Error('removeTag ' + path + ' ' + JSON.stringify(body));
   if (method === 'DELETE') throw new Error('delete ' + path);
-  if (method === 'GET' && path.includes('/tasks/')) {
-    return res({ data: { gid: '2222222222222', tags: [
-      { gid: '9001', name: 'TODAY-Dimitra' },
-      { gid: '9002', name: 'TOMORROW-Dimitra' },
-      { gid: '9003', name: '919a' },
-      { gid: '9004', name: 'TOMORROW-Unassigned' },
-    ] } });
+  if (method === 'GET' && path.includes('/projects')) {
+    return res({ data: [{ gid: '3333333333333', name: '919 Client', archived: false }] });
   }
-  if (method === 'PUT') return res({ data: { due_on: body.data.due_on || null, due_at: body.data.due_at || null } });
-  if (method === 'POST' && path.includes('removeTag')) return res({ data: {} });
+  if (method === 'GET' && path.includes('/tasks/')) {
+    return res({ data: {
+      gid: '2222222222222', name: '054a Review', notes: 'D10M\nbody', html_notes: '<body>D10M\nbody</body>',
+      due_on: '2026-10-01', tags: [{ gid: '9001', name: 'TODAY-Dimitra' }, { gid: '9003', name: '919a' }],
+    } });
+  }
+  if (method === 'PUT') {
+    const data = (body && body.data) || {};
+    return res({ data: {
+      gid: '2222222222222', name: data.name || '054a Review', notes: 'D10M\nbody', html_notes: '<body>D10M\nbody</body>',
+      due_on: Object.prototype.hasOwnProperty.call(data, 'due_on') ? data.due_on : '2026-10-01',
+      due_at: data.due_at || null,
+      assignee: data.assignee ? { name: 'Antonia', gid: data.assignee } : { name: 'Dimitra', gid: '1213448798749941' },
+    } });
+  }
+  if (method === 'POST' && path.startsWith('/tasks')) {
+    const data = (body && body.data) || {};
+    return res({ data: { gid: '4444444444444', name: data.name || '', notes: data.notes || 'D10M', due_on: data.due_on || '', projects: [{ gid: '3333333333333', name: '919 Client' }] } });
+  }
   return res({ data: {} });
 };
 
@@ -41,18 +54,26 @@ const tomorrow = L.addDays(today, 1);
 const monday = L.nextMonday(today);
 const TASK = '2222222222222';
 
-function removed() { return calls.filter((c) => c.path.includes('removeTag')).map((c) => c.body.data.tag); }
 function puts() { return calls.filter((c) => c.method === 'PUT'); }
+function tagCalls() {
+  return calls.filter((c) => /\/tags|addTag|removeTag|tags\.name/i.test(c.path) || (c.body && /"tag"/.test(JSON.stringify(c.body))));
+}
 
 (async () => {
+  calls.length = 0;
+  const td = await S.movePlan({ i: TASK, from: null, to: { s: 't', k: 'dd' } });
+  a.equal(td.d, today);
+  a.equal(puts().length, 1);
+  a.equal(puts()[0].body.data.due_on, today);
+  a.equal(puts()[0].body.data.due_on, L.slotDue('t', today));
+  a.deepEqual(tagCalls(), []);
+
   calls.length = 0;
   const w = await S.movePlan({ i: TASK, from: { s: 't', k: 'dd' }, to: { s: 'w', k: 'dd' } });
   a.equal(w.d, tomorrow);
   a.equal(puts().length, 1);
   a.equal(puts()[0].body.data.due_on, tomorrow);
-  a.deepEqual(removed().slice().sort(), ['9001', '9002', '9004']); // plan tags only; not the 919a tag
-  a.ok(!calls.some((c) => c.method === 'POST' && (c.path.includes('addTag') || /\/tags$/.test(c.path))));
-  // Friday's Tomorrow is Saturday, not the old next-workday Monday.
+  a.deepEqual(tagCalls(), []);
   if (new Date(today + 'T12:00:00Z').getUTCDay() === 5) a.notEqual(puts()[0].body.data.due_on, L.nextWorkday(today));
 
   calls.length = 0;
@@ -61,11 +82,60 @@ function puts() { return calls.filter((c) => c.method === 'PUT'); }
   a.equal(puts().length, 1);
   a.equal(puts()[0].body.data.due_on, monday);
   a.equal(puts()[0].body.data.due_on, L.slotDue('mo', today));
-  a.deepEqual(removed().slice().sort(), ['9001', '9002', '9004']);
-  a.ok(!calls.some((c) => /TOMORROW-|MONDAY-/.test(JSON.stringify(c.body))));
-  a.ok(!calls.some((c) => c.method === 'POST' && (c.path.includes('addTag') || /\/tags$/.test(c.path))));
+  a.deepEqual(tagCalls(), []);
 
-  // Fixed Friday, independent of the machine clock: Tomorrow Saturday, Monday the 9th.
+  calls.length = 0;
+  const back = await S.movePlan({ i: TASK, from: { s: 't', k: 'dd' }, to: null });
+  a.equal(back.d, '');
+  a.equal(puts().length, 1);
+  a.equal(puts()[0].body.data.due_on, null);
+  a.equal(puts()[0].body.data.due_at, null);
+  a.deepEqual(tagCalls(), []);
+
+  calls.length = 0;
+  const same = await S.movePlan({ i: TASK, from: { s: 't', k: 'dd' }, to: { s: 't', k: 'dd' } });
+  a.equal(same.d, undefined);
+  a.equal(puts().length, 0);
+  a.deepEqual(calls, []);
+
+  calls.length = 0;
+  const asg = await S.assignTask({ i: TASK, a: 'ak', from: { s: 't', k: 'dd' } });
+  a.equal(asg.a, 'ak');
+  a.equal(puts().length, 1);
+  a.equal(puts()[0].body.data.assignee, '1213448855148301');
+  a.deepEqual(tagCalls(), []);
+
+  calls.length = 0;
+  const edited = await S.updateTask(TASK, { due_on: tomorrow });
+  a.ok(edited.changed.includes('due_on'));
+  a.equal(puts().length, 1);
+  a.equal(puts()[0].body.data.due_on, tomorrow);
+  a.deepEqual(tagCalls(), []);
+
+  calls.length = 0;
+  const cleared = await S.clearToday({ entries: [{ i: TASK, t: 'dd' }] });
+  a.equal(cleared.cleared, 1);
+  a.deepEqual(cleared.failed, []);
+  a.equal(puts().length, 1);
+  a.equal(puts()[0].body.data.due_on, null);
+  a.deepEqual(tagCalls(), []);
+
+  calls.length = 0;
+  const marked = await S.setToday({ i: TASK, t: 'dd', prev: 'dm' });
+  a.equal(marked.d, today);
+  a.equal(puts().length, 1);
+  a.equal(puts()[0].body.data.due_on, today);
+  a.deepEqual(tagCalls(), []);
+
+  calls.length = 0;
+  const made = await S.createTask({ name: '919 Review', notes: 'D10M', project: '3333333333333', a: 'dd', slot: { s: 't', k: 'dd' } });
+  a.equal(made.d, today);
+  a.equal(made.t, 'dd');
+  const created = calls.filter((c) => c.method === 'POST' && c.path.startsWith('/tasks'));
+  a.equal(created.length, 1);
+  a.equal(created[0].body.data.due_on, today);
+  a.deepEqual(tagCalls(), []);
+
   a.equal(L.slotDue('w', '2026-11-06'), '2026-11-07');
   a.equal(L.slotDue('mo', '2026-11-06'), '2026-11-09');
   console.log('plan date tests: all passed');

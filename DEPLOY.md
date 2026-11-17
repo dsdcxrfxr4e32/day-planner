@@ -1,6 +1,6 @@
 # Deploy the day planner on Render (free web service)
 
-The app is stateless on Render: secrets come from env vars, Today/Tomorrow/Monday follow the Asana due date (Today may still add a TODAY-<Name> tag; Tomorrow and Monday never add a tag), logs go to stdout.
+The app is stateless on Render: secrets come from env vars, Today/Tomorrow/Monday follow the Asana due date only (a move never creates, adds, or removes a tag), logs go to stdout.
 The box copy (`/workspace/day-planner-app`, `./run.sh`, Tailscale Funnel) keeps working unchanged.
 
 ## Env vars to set on Render (names only; values from the box, never commit them)
@@ -44,7 +44,7 @@ Env vars to set on Vercel (names only; copy the values from Render). Do not comm
 
 Any further feed is `CAL_ICS_<NAME>` or `CAL_ICS_<NAME>_<SUFFIX>`. Leave a calendar var unset for "calendar not connected".
 
-Do not set `TODAY_STORE=file` (the disk is read-only; the default `asana_tags` is correct). Do not set `READ_ONLY` in production. Vercel sets `VERCEL` and `VERCEL_GIT_COMMIT_SHA` itself. In-memory caches (tag gids, calendars, project list) refill on a cold start; nothing is scheduled in the background. Dates use `Europe/Athens` explicitly, not the server timezone.
+Do not set `TODAY_STORE=file` (the disk is read-only; the default `asana_tags` is correct and means due dates, not tags). Do not set `READ_ONLY` in production. Vercel sets `VERCEL` and `VERCEL_GIT_COMMIT_SHA` itself. In-memory caches (calendars, project list) refill on a cold start; nothing is scheduled in the background. Dates use `Europe/Athens` explicitly, not the server timezone.
 
 After the first deploy, before Google login is turned on: `https://<project>.vercel.app/healthz` → `{"ok":true}`, then `https://<project>.vercel.app/?k=<ACCESS_KEY>`.
 
@@ -68,7 +68,7 @@ Create the OAuth client in Google Cloud, then set the env vars. Until `GOOGLE_CL
 
 ## Free-plan behaviour
 - Sleeps after 15 min without traffic; the first request after that takes ~30-60 s (cold start). Nothing is lost: state is in Asana.
-- Disk is ephemeral: `data/` is recreated empty on each start; the tag-gid cache refills from Asana, calendars refetch (5 min cache).
+- Disk is ephemeral: `data/` is recreated empty on each start; calendars refetch (5 min cache).
 - 750 free instance hours/month per workspace, enough for one always-reachable service.
 
 ## Local check of stateless mode
