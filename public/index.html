@@ -90,7 +90,7 @@ h2{font-size:16px;line-height:22px;margin:0 0 4px;font-weight:600}
 .colhd b{font-size:14px;font-weight:600}
 .scroll{max-height:640px;overflow-y:auto;padding-right:2px}
 .grp{margin-bottom:10px}
-.grphd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;padding:4px 2px 6px;margin-bottom:6px;border-bottom:1px solid var(--bds)}
+.grphd{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 2px 6px;margin-bottom:6px;border-bottom:1px solid var(--bds)}
 .grphd .lbl{font-size:24px;line-height:1.2;font-weight:600;letter-spacing:.3px}
 .card{background:var(--elev);border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;cursor:grab;position:relative}
 .card.gray{background:var(--subtle);border-style:dashed;opacity:.6}
@@ -232,14 +232,20 @@ h1{font-size:1.25rem;line-height:1;margin:0}
 h2{font-size:1.5rem;line-height:1.2;border:0;padding:0;margin:0 0 12px;color:#1e1f21}
 .summary,.cap{color:#5c5f64}
 .load .hd>span:first-child{font-size:1.25rem;line-height:1.1;color:#1e1f21!important}
+.colhd{align-items:center;margin-bottom:12px}
 .colhd b{font-size:1.25rem;line-height:1.2}
+.colhd b.coltitle{font-size:2rem;line-height:1.15;min-width:0}
+.col{container-type:inline-size}
+@container (max-width:220px){.colhd b.coltitle{font-size:1.45rem;line-height:1.1}}
 .metric{font-weight:500;font-variant-numeric:tabular-nums;color:#1e1f21}
 .grphd{align-items:center;border-bottom:1px solid #e4e4e6}
 .colsub{font:500 .875rem/1.25rem "IBM Plex Sans",sans-serif;letter-spacing:0;text-transform:none;color:#5c5f64}
-.grphd .lbl{font:500 1.75rem/1.2 "IBM Plex Sans",sans-serif;letter-spacing:0;text-transform:none;color:#5c5f64;min-width:0;flex:1 1 8rem;overflow-wrap:anywhere}
+/* IBM Plex Sans cap-height is 0.698em. line-height:1 makes the line box the em square;
+   align-items:center then puts the circle on that middle, which is the cap-height middle. */
+.grphd .lbl{display:flex;align-items:center;gap:10px;font:500 1.75rem/1 "IBM Plex Sans",sans-serif;letter-spacing:0;text-transform:none;color:#5c5f64;min-width:0;flex:1 1 8rem;overflow-wrap:anywhere}
 .grphd .small{flex:none;align-self:center}
-.grphd .addb{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;margin:0 0 0 8px;padding:0;border:0;border-radius:50%;background:#1e1f21;color:#fff;vertical-align:middle;flex:none;line-height:0;cursor:pointer}
-.grphd .addb svg{display:block;width:14px;height:14px}
+.grphd .addb{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;margin:0;padding:0;border:0;border-radius:50%;background:#1e1f21;color:#fff;vertical-align:baseline;align-self:center;flex:none;line-height:0;cursor:pointer}
+.grphd .addb svg{display:block;width:9.8px;height:9.8px}
 .grphd .addb:hover{background:#3a3b3e;border-color:transparent;color:#fff}
 .grphd .addb:focus-visible{outline:none;border-color:transparent;box-shadow:0 0 0 3px #fff,0 0 0 5px #1e1f21}
 .card,.load,.col,.pane,.toast,.mlist{background:#ffffff;border:1px solid rgb(30 31 33 / 10%);border-radius:.525rem;box-shadow:none}
@@ -624,12 +630,12 @@ h2{font-size:1.5rem;line-height:1.2;border:0;padding:0;margin:0 0 12px;color:#1e
     extra = extra || [];
     var zone = k + kind;
     var h = '<div class="col' + (S.over === zone ? ' hot' : '') + '" data-zone="' + zone + '" data-k="' + k + '" data-kind="' + kind + '">';
-    h += '<div class="colhd"><b>' + title + '</b><span class="small">' + items.length + (items.length === 1 ? ' task' : ' tasks') + ' · ' + hm(total) + '</span></div><div class="scroll">';
+    h += '<div class="colhd"><b class="coltitle">' + title + '</b><span class="small">' + items.length + (items.length === 1 ? ' task' : ' tasks') + ' · ' + hm(total) + '</span></div><div class="scroll">';
     h += meetingBlocks(mt);
     groupTasks(items.concat(extra)).forEach(function (grp) {
       var own = grp.xs.filter(function (x) { return x.a === k; }), un = grp.xs.filter(function (x) { return x.a !== k; });
       var sp = sectionProject(grp);
-      var add = sp ? ' <button class="addb" data-act="new" data-k="' + k + '" data-kind="' + kind + '" data-pg="' + esc(sp.g) + '" data-pn="' + esc(sp.n) + '" data-pre="' + esc(sp.pre) +
+      var add = sp ? '<button class="addb" data-act="new" data-k="' + k + '" data-kind="' + kind + '" data-pg="' + esc(sp.g) + '" data-pn="' + esc(sp.n) + '" data-pre="' + esc(sp.pre) +
         '" title="New task in ' + esc(sp.n) + '" aria-label="New task in ' + esc(sp.n) + '"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 2.6v10.8M2.6 8h10.8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>' : '';
       h += '<div class="grp"><div class="grphd"><span class="lbl">' + esc(grp.g.label) + add + '</span><span class="small">' + own.length + ' · ' + hm(sum(own)) +
         (un.length ? '<span style="opacity:.8">  + ' + un.length + ' unassigned · ' + hm(sum(un)) + '</span>' : '') + '</span></div>';
