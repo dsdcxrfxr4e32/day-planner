@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const L = require('./lib');
 const CAL = require('./cal');
 const AUTH = require('./auth');
+const DUP = require('./duplicate');
 
 const DIR = __dirname;
 // data/ is optional (box: access_key, cal.env, tag cache). On hosts with an ephemeral disk (Render) everything
@@ -562,6 +563,12 @@ async function handle(req, res) {
       return send(res, 200, pageHtml(''), 'text/html; charset=utf-8', HTML_HEADERS);
     }
     if (req.method === 'GET' && url.pathname === '/api/board') return send(res, 200, { ...(await getBoard(url.searchParams.get('refresh') === '1')), build: BUILD });
+    const dup = /^\/api\/tasks\/(\d{5,25})\/duplicate$/.exec(url.pathname);
+    if (dup && req.method === 'POST') {
+      const out = await DUP.runDuplicate(asana, dup[1], sleep);
+      console.log(new Date().toISOString(), url.pathname, 'duplicate', out.i);
+      return send(res, 200, out);
+    }
     const tm = /^\/api\/task\/(\d{5,25})$/.exec(url.pathname);
     if (tm && req.method === 'GET') return send(res, 200, await getTask(tm[1]));
     if (req.method === 'POST' && (ROUTES[url.pathname] || tm)) {

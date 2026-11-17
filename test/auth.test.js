@@ -81,6 +81,8 @@ a.equal(AUTH.cookieFrom('a=1; ' + AUTH.COOKIE + '=' + good + '; b=2'), good);
   a.equal(r.status, 401);
   r = await call('POST', '/api/plan', {}, '{}');
   a.equal(r.status, 401);
+  r = await call('POST', '/api/tasks/123456789/duplicate');
+  a.equal(r.status, 401);
   r = await call('GET', '/', cookie);
   a.equal(r.status, 200);
   a.ok(r.body.includes('id="app"'));
